@@ -1,0 +1,29 @@
+[project]
+name = "factoryflow"
+version = "0.1.0"
+description = "FactoryFlow — offline scan/sim/RL platform for mobile manipulators"
+readme = "README.md"
+# The GB10 target is Python 3.11 (see master doc, Part 2 "Glue language").
+# Left as >=3.11 rather than pinned <3.12 so laptops on newer interpreters can
+# run tonight without downloading a second toolchain. All code is 3.11-compatible.
+requires-python = ">=3.11"
+
+# No runtime dependencies, deliberately. Everything here is stdlib so it needs
+# no ARM wheel builds for the GB10 and nothing to vendor onto the USB drive.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+factoryflow-agentic = "factoryflow.agentic.agentic_session:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["factoryflow"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

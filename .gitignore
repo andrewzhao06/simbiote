@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Local staging dir — trajectories, reports, trained policies.
+# On the GB10 this is /var/factoryflow/stage (see master doc Part 3).
+stage/

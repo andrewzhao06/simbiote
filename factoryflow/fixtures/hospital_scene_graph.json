@@ -1,0 +1,109 @@
+{
+  "schema_version": "0.1",
+  "scene_id": "hospital_01",
+  "source": "hand-written fixture — stands in for Teammate 1's scenegraph/build_graph.py output",
+  "units": "meters",
+  "up_axis": "Z",
+  "nodes": [
+    {
+      "id": "corridor",
+      "kind": "location",
+      "label": "corridor",
+      "aliases": ["hallway", "main corridor"],
+      "pose": { "x": 0.0, "y": 0.0, "z": 0.0, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [-1.5, -12.0, 0.0], "max": [1.5, 12.0, 2.8] },
+      "navigable": true
+    },
+    {
+      "id": "supply_room",
+      "kind": "location",
+      "label": "supply room",
+      "aliases": ["supply", "storage room", "stores"],
+      "pose": { "x": -4.0, "y": 6.0, "z": 0.0, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [-7.0, 3.5, 0.0], "max": [-1.5, 8.5, 2.8] },
+      "navigable": true
+    },
+    {
+      "id": "room_1",
+      "kind": "location",
+      "label": "Room 1",
+      "aliases": ["room one", "patient room 1"],
+      "pose": { "x": 4.0, "y": 6.0, "z": 0.0, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [1.5, 3.5, 0.0], "max": [7.0, 8.5, 2.8] },
+      "navigable": true
+    },
+    {
+      "id": "room_2",
+      "kind": "location",
+      "label": "Room 2",
+      "aliases": ["room two", "patient room 2"],
+      "pose": { "x": 4.0, "y": -6.0, "z": 0.0, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [1.5, -8.5, 0.0], "max": [7.0, -3.5, 2.8] },
+      "navigable": true
+    },
+    {
+      "id": "nurse_station",
+      "kind": "location",
+      "label": "nurse station",
+      "aliases": ["nurses station", "front desk"],
+      "pose": { "x": -4.0, "y": -6.0, "z": 0.0, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [-7.0, -8.5, 0.0], "max": [-1.5, -3.5, 2.8] },
+      "navigable": true
+    },
+    {
+      "id": "tray_01",
+      "kind": "object",
+      "label": "tray",
+      "aliases": ["food tray", "meal tray"],
+      "pose": { "x": -4.2, "y": 6.4, "z": 0.82, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [-4.45, 6.2, 0.78], "max": [-3.95, 6.6, 0.86] },
+      "is_graspable": true,
+      "grasp_type": "top",
+      "mass_kg": 0.8
+    },
+    {
+      "id": "cart_01",
+      "kind": "object",
+      "label": "supply cart",
+      "aliases": ["cart", "trolley"],
+      "pose": { "x": -5.6, "y": 5.1, "z": 0.45, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [-6.0, 4.7, 0.0], "max": [-5.2, 5.5, 0.95] },
+      "is_graspable": true,
+      "grasp_type": "handle",
+      "mass_kg": 14.0
+    },
+    {
+      "id": "wheelchair_01",
+      "kind": "object",
+      "label": "wheelchair",
+      "aliases": ["chair", "the wheelchair"],
+      "pose": { "x": 3.7, "y": 5.4, "z": 0.4, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [3.3, 5.0, 0.0], "max": [4.1, 5.9, 1.05] },
+      "is_graspable": true,
+      "grasp_type": "handle",
+      "mass_kg": 15.5,
+      "handle_pose": { "x": 3.7, "y": 5.75, "z": 0.95, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 }
+    },
+    {
+      "id": "iv_stand_01",
+      "kind": "object",
+      "label": "IV stand",
+      "aliases": ["drip stand", "iv pole"],
+      "pose": { "x": 4.6, "y": -5.8, "z": 0.7, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+      "bbox": { "min": [4.4, -6.0, 0.0], "max": [4.8, -5.6, 1.6] },
+      "is_graspable": false,
+      "grasp_type": null,
+      "mass_kg": 6.0
+    }
+  ],
+  "edges": [
+    { "from": "tray_01", "to": "supply_room", "relation": "in" },
+    { "from": "cart_01", "to": "supply_room", "relation": "in" },
+    { "from": "wheelchair_01", "to": "room_1", "relation": "in" },
+    { "from": "iv_stand_01", "to": "room_2", "relation": "in" },
+    { "from": "supply_room", "to": "corridor", "relation": "connects_to" },
+    { "from": "room_1", "to": "corridor", "relation": "connects_to" },
+    { "from": "room_2", "to": "corridor", "relation": "connects_to" },
+    { "from": "nurse_station", "to": "corridor", "relation": "connects_to" }
+  ]
+}
