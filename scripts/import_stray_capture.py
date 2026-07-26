@@ -83,7 +83,7 @@ def main() -> int:
 
     target = copy_capture(source, args.destination.expanduser().resolve(), name)
     print(f"Uploaded capture to: {target}")
-    print(f'Validate it with: python -m factoryflow_mapper.cli ingest "{target}"')
+    print(f'Validate it with: simbiote-map ingest "{target}"')
 
     if args.ssd:
         ssd_target = copy_capture(source, SSD_DESTINATION, name)

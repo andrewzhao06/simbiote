@@ -9,7 +9,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from factoryflow_mapper.config import MapperConfig
+from simbiote.mapper.config import MapperConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,26 +89,26 @@ def run_doctor(config: MapperConfig) -> list[Check]:
         ),
         Check(
             "COLMAP adapter",
-            bool(os.getenv("FACTORYFLOW_COLMAP_COMMAND")),
-            "FACTORYFLOW_COLMAP_COMMAND",
+            bool(os.getenv("SIMBIOTE_COLMAP_COMMAND")),
+            "SIMBIOTE_COLMAP_COMMAND",
             required=production,
         ),
         Check(
             "depth adapter",
-            bool(os.getenv("FACTORYFLOW_DEPTH_COMMAND")),
-            "FACTORYFLOW_DEPTH_COMMAND",
+            bool(os.getenv("SIMBIOTE_DEPTH_COMMAND")),
+            "SIMBIOTE_DEPTH_COMMAND",
             required=production,
         ),
         Check(
             "3DGRUT adapter",
-            bool(os.getenv("FACTORYFLOW_DGRUT_COMMAND")),
-            "FACTORYFLOW_DGRUT_COMMAND",
+            bool(os.getenv("SIMBIOTE_DGRUT_COMMAND")),
+            "SIMBIOTE_DGRUT_COMMAND",
             required=production,
         ),
         Check(
             "SAM 3 adapter",
-            bool(os.getenv("FACTORYFLOW_SAM3_COMMAND")),
-            "FACTORYFLOW_SAM3_COMMAND",
+            bool(os.getenv("SIMBIOTE_SAM3_COMMAND")),
+            "SIMBIOTE_SAM3_COMMAND",
             required=production,
         ),
     ]

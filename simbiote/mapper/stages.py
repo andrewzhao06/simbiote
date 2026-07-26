@@ -10,8 +10,8 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from factoryflow_mapper.config import MapperConfig
-from factoryflow_mapper.models import BoundingBox, CaptureBundle, SceneGraph, SceneNode
+from simbiote.mapper.config import MapperConfig
+from simbiote.mapper.models import BoundingBox, CaptureBundle, SceneGraph, SceneNode
 
 
 class StageError(RuntimeError):
@@ -169,7 +169,7 @@ def refine_poses(
     )
     if config.mode == "production":
         _run_adapter(
-            "FACTORYFLOW_COLMAP_COMMAND",
+            "SIMBIOTE_COLMAP_COMMAND",
             {"capture": capture.root, "output": output},
             output,
         )
@@ -183,7 +183,7 @@ def complete_depth(
     output.mkdir(parents=True, exist_ok=True)
     if config.mode == "production":
         _run_adapter(
-            "FACTORYFLOW_DEPTH_COMMAND",
+            "SIMBIOTE_DEPTH_COMMAND",
             {
                 "capture": refined.capture.root,
                 "colmap": refined.artifact_dir,
@@ -209,7 +209,7 @@ def reconstruct(
     geometry: Path | None = None
     if config.mode == "production":
         _run_adapter(
-            "FACTORYFLOW_DGRUT_COMMAND",
+            "SIMBIOTE_DGRUT_COMMAND",
             {
                 "capture": depth.refined.capture.root,
                 "colmap": depth.refined.artifact_dir,
@@ -248,7 +248,7 @@ def label_scene(
     detections_path = output / "detections.json"
     if config.mode == "production":
         _run_adapter(
-            "FACTORYFLOW_SAM3_COMMAND",
+            "SIMBIOTE_SAM3_COMMAND",
             {
                 "capture": scene.depth.refined.capture.root,
                 "geometry": scene.geometry_path or Path(""),

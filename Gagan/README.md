@@ -1,6 +1,6 @@
 # Gagan — Scan & Map
 
-The mapper implementation is packaged in `src/factoryflow_mapper/`.
+The mapper implementation is packaged in `simbiote/mapper/`.
 
 This directory holds Gagan-specific tests. The mapper ingests Stray Scanner
 captures and produces an OpenUSD scene plus a scene-graph sidecar for Suraj's
@@ -25,6 +25,6 @@ python -m pytest Gagan/tests
 
 Production semantic labeling uses the official Hugging Face
 `facebook/sam3` checkpoint, `sam3.pt`. Store it at `D:\AI\models\sam3`
-locally and `/mnt/factoryflow-ssd/AI/models/sam3` on the GB10. The adapter
+locally and `/mnt/simbiote-ssd/AI/models/sam3` on the GB10. The adapter
 applies configured text prompts to the first RGB frame and converts detections
 into the mapper's `detections.json` contract.

@@ -1,15 +1,15 @@
 [paths]
 # Change this to the AI directory on the SSD mounted on the GB10.
-ssd_root = "/mnt/factoryflow-ssd/AI"
-work_root = "/var/factoryflow/stage/mapper"
-models_root = "/mnt/factoryflow-ssd/AI/models"
-tools_root = "/mnt/factoryflow-ssd/AI/repos"
+ssd_root = "/mnt/simbiote-ssd/AI"
+work_root = "/var/simbiote/stage/mapper"
+models_root = "/mnt/simbiote-ssd/AI/models"
+tools_root = "/mnt/simbiote-ssd/AI/repos"
 colmap_binary = "/usr/local/bin/colmap"
 ffprobe_binary = "/usr/bin/ffprobe"
-depth_checkpoint = "/mnt/factoryflow-ssd/AI/models/depth-anything"
-sam3_checkpoint = "/mnt/factoryflow-ssd/AI/models/sam3"
-dgrut_root = "/mnt/factoryflow-ssd/AI/repos/3dgrut"
-hospital_usd = "/mnt/factoryflow-ssd/AI/assets/hospital/hospital.usd"
+depth_checkpoint = "/mnt/simbiote-ssd/AI/models/depth-anything"
+sam3_checkpoint = "/mnt/simbiote-ssd/AI/models/sam3"
+dgrut_root = "/mnt/simbiote-ssd/AI/repos/3dgrut"
+hospital_usd = "/mnt/simbiote-ssd/AI/assets/hospital/hospital.usd"
 
 [pipeline]
 # Use "proxy" to test capture parsing and the Step 2 USD contract without geometry.

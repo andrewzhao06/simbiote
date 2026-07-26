@@ -8,7 +8,7 @@ fi
 
 SSD_ROOT="$(readlink -f "$1")"
 REPO_ROOT="$(readlink -f "${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}")"
-WORK_ROOT="/var/factoryflow/stage/mapper"
+WORK_ROOT="/var/simbiote/stage/mapper"
 AI_ROOT="$SSD_ROOT"
 
 if [[ ! -d "$SSD_ROOT" ]]; then
@@ -41,7 +41,7 @@ config = Path(sys.argv[1])
 root = sys.argv[2]
 text = config.read_text()
 replacements = {
-    "/mnt/factoryflow-ssd/AI": root,
+    "/mnt/simbiote-ssd/AI": root,
     "/usr/local/bin/colmap": "colmap",
 }
 for source, target in replacements.items():
@@ -51,18 +51,18 @@ PY
 
 ENV_FILE="$REPO_ROOT/config/mapper.gb10.env"
 cat > "$ENV_FILE" <<EOF
-# Source this before running factoryflow-map in production mode.
-export FACTORYFLOW_MODE=production
+# Source this before running simbiote-map in production mode.
+export SIMBIOTE_MODE=production
 export DGRUT_ROOT="$AI_ROOT/repos/3dgrut"
 export SAM3_ROOT="$AI_ROOT/repos/sam3"
 # Point these at their separate CUDA-enabled environments after installation.
 export DGRUT_PYTHON="\$DGRUT_ROOT/.venv/bin/python"
 export DA3_BIN="da3"
 export SAM3_PYTHON="python"
-export FACTORYFLOW_COLMAP_COMMAND="$REPO_ROOT/scripts/gb10/run_colmap.sh {capture} {output}"
-export FACTORYFLOW_DEPTH_COMMAND="$REPO_ROOT/scripts/gb10/run_depth.sh {capture} {colmap} {checkpoint} {output}"
-export FACTORYFLOW_DGRUT_COMMAND="$REPO_ROOT/scripts/gb10/run_3dgrut.sh {capture} {colmap} {depth} {output}"
-export FACTORYFLOW_SAM3_COMMAND="$REPO_ROOT/scripts/gb10/run_sam3.sh {capture} {geometry} {checkpoint} {output}"
+export SIMBIOTE_COLMAP_COMMAND="$REPO_ROOT/scripts/gb10/run_colmap.sh {capture} {output}"
+export SIMBIOTE_DEPTH_COMMAND="$REPO_ROOT/scripts/gb10/run_depth.sh {capture} {colmap} {checkpoint} {output}"
+export SIMBIOTE_DGRUT_COMMAND="$REPO_ROOT/scripts/gb10/run_3dgrut.sh {capture} {colmap} {depth} {output}"
+export SIMBIOTE_SAM3_COMMAND="$REPO_ROOT/scripts/gb10/run_sam3.sh {capture} {geometry} {checkpoint} {output}"
 EOF
 
 if command -v uv >/dev/null 2>&1; then
@@ -80,4 +80,4 @@ echo "  1. Copy the scan into '$AI_ROOT/captures/'."
 echo "  2. Confirm model paths; this setup uses the SSD's existing AI/models and AI/repos layout."
 echo "  3. Source '$ENV_FILE'."
 echo "  4. Run: '$REPO_ROOT/scripts/gb10/preflight_mapper.sh' '$AI_ROOT' '$REPO_ROOT'"
-echo "  5. Run: uv run factoryflow-map --config '$CONFIG' doctor"
+echo "  5. Run: uv run simbiote-map --config '$CONFIG' doctor"

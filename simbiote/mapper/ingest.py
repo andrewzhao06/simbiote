@@ -6,7 +6,7 @@ import csv
 import math
 from pathlib import Path
 
-from factoryflow_mapper.models import (
+from simbiote.mapper.models import (
     CameraIntrinsics,
     CaptureBundle,
     Frame,

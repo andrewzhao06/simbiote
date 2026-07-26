@@ -4,7 +4,7 @@ Simbiote combines all four teammate modules for the GB10 robotics workflow:
 
 | Owner | Responsibility | Primary code |
 | --- | --- | --- |
-| Gagan | Stray Scanner capture to OpenUSD scene map | `src/factoryflow_mapper/` |
+| Gagan | Stray Scanner capture to OpenUSD scene map | `simbiote/mapper/` |
 | Suraj | Simulation, robot interfaces, and policy training | `simbiote/sim_env/`, `simbiote/training/` |
 | Sky | Hand-tracking teleoperation | `simbiote/teleop/` |
 | Andrew | Scene querying and agentic robot control | `simbiote/agentic/` |
@@ -35,9 +35,11 @@ python scripts\import_stray_capture.py "C:\path\to\StrayScannerExport" --name ho
 Then validate:
 
 ```powershell
-$env:PYTHONPATH="$PWD\src"
-python -m factoryflow_mapper.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
+simbiote-map ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
 ```
+
+(The `simbiote-map` CLI is installed with the package; see Development below. You
+can also run it as `python -m simbiote.mapper.cli` without installing.)
 
 Project references are organized in:
 - `docs/SIMBIOTE_MASTER_PLAN.md` — full platform plan
@@ -69,11 +71,10 @@ a real capture-geometry preview; it is not a 3DGUT reconstruction or semantic
 SAM 3 run.
 
 ```powershell
-$env:PYTHONPATH="$PWD\src"
-$env:FACTORYFLOW_MODE="preview"
-$env:FACTORYFLOW_WORK_ROOT="$PWD\.local\work"
+$env:SIMBIOTE_MODE="preview"
+$env:SIMBIOTE_WORK_ROOT="$PWD\.local\work"
 
-python -m factoryflow_mapper.cli --config config/mapper.example.toml run `
+simbiote-map --config config/mapper.example.toml run `
   --capture ".\UPLOAD_PHONE_SCANS_HERE\<scan-name>" `
   --out ".\.local\preview.usda"
 ```
@@ -121,13 +122,13 @@ chmod +x scripts/setup_gb10_mapper.sh
 ./scripts/setup_gb10_mapper.sh /absolute/path/to/ssd
 ```
 
-This creates `/var/factoryflow/stage/mapper`, generates
+This creates `/var/simbiote/stage/mapper`, generates
 `config/mapper.gb10.toml`, and installs the Python package with `uv`.
 
 Edit `config/mapper.gb10.toml` to match the actual downloaded directories. Then run:
 
 ```bash
-uv run factoryflow-map --config config/mapper.gb10.toml doctor
+uv run simbiote-map --config config/mapper.gb10.toml doctor
 ```
 
 `doctor` returns nonzero if a requirement for the selected mode is missing. The
@@ -138,19 +139,19 @@ architecture check is informational so development on x86 laptops still works.
 Start in proxy mode in `config/mapper.gb10.toml`:
 
 ```bash
-uv run factoryflow-map --config config/mapper.gb10.toml \
+uv run simbiote-map --config config/mapper.gb10.toml \
   ingest /path/to/ssd/captures/test-scan
 
-uv run factoryflow-map --config config/mapper.gb10.toml \
+uv run simbiote-map --config config/mapper.gb10.toml \
   run --capture /path/to/ssd/captures/test-scan \
-  --out /var/factoryflow/stage/test-scan.usda \
+  --out /var/simbiote/stage/test-scan.usda \
   --allow-proxy
 ```
 
 Then validate:
 
 ```bash
-uv run factoryflow-map validate /var/factoryflow/stage/test-scan.usda --allow-proxy
+uv run simbiote-map validate /var/simbiote/stage/test-scan.usda --allow-proxy
 ```
 
 ### Metadata-only Stray Scanner export
@@ -163,7 +164,7 @@ they have no RGB frames or LiDAR depth.
 Validate one explicitly:
 
 ```bash
-uv run factoryflow-map --config config/mapper.gb10.toml \
+uv run simbiote-map --config config/mapper.gb10.toml \
   ingest /path/to/metadata-only-scan --allow-metadata-only
 ```
 
@@ -181,7 +182,7 @@ Set these variables after sourcing a local `.env` or shell script:
 ### COLMAP
 
 ```bash
-export FACTORYFLOW_COLMAP_COMMAND="/opt/factoryflow/bin/run_colmap.sh {capture} {output}"
+export SIMBIOTE_COLMAP_COMMAND="/opt/simbiote/bin/run_colmap.sh {capture} {output}"
 ```
 
 Available placeholders: `{capture}`, `{output}`.
@@ -192,7 +193,7 @@ seed/refine from `odometry.csv` and write its COLMAP artifacts under the output 
 ### Depth Anything
 
 ```bash
-export FACTORYFLOW_DEPTH_COMMAND="/opt/factoryflow/bin/run_depth.sh {capture} {colmap} {checkpoint} {output}"
+export SIMBIOTE_DEPTH_COMMAND="/opt/simbiote/bin/run_depth.sh {capture} {colmap} {checkpoint} {output}"
 ```
 
 Available placeholders: `{capture}`, `{colmap}`, `{checkpoint}`, `{output}`.
@@ -204,7 +205,7 @@ to be nonempty.
 ### 3DGRUT
 
 ```bash
-export FACTORYFLOW_DGRUT_COMMAND="/opt/factoryflow/bin/run_3dgrut.sh {capture} {colmap} {depth} {output}"
+export SIMBIOTE_DGRUT_COMMAND="/opt/simbiote/bin/run_3dgrut.sh {capture} {colmap} {depth} {output}"
 ```
 
 Available placeholders: `{capture}`, `{colmap}`, `{depth}`, `{output}`, `{dgrut}`.
@@ -218,7 +219,7 @@ pipeline refuses to continue if the USD geometry layer does not exist; a raw `.p
 ### SAM 3
 
 ```bash
-export FACTORYFLOW_SAM3_COMMAND="/opt/factoryflow/bin/run_sam3.sh {capture} {geometry} {checkpoint} {output}"
+export SIMBIOTE_SAM3_COMMAND="/opt/simbiote/bin/run_sam3.sh {capture} {geometry} {checkpoint} {output}"
 ```
 
 Available placeholders: `{capture}`, `{geometry}`, `{checkpoint}`, `{output}`.
@@ -270,7 +271,7 @@ interfaces rather than mock output:
 Run the setup script, then source its generated environment:
 
 ```bash
-./scripts/setup_gb10_mapper.sh /mnt/factoryflow-ssd
+./scripts/setup_gb10_mapper.sh /mnt/simbiote-ssd
 source config/mapper.gb10.env
 ```
 
@@ -292,7 +293,7 @@ Windows environment will not work.
 Run the strict hardware and asset check before attempting a production map:
 
 ```bash
-scripts/gb10/preflight_mapper.sh /mnt/factoryflow-ssd/AI "$PWD"
+scripts/gb10/preflight_mapper.sh /mnt/simbiote-ssd/AI "$PWD"
 ```
 
 It blocks on missing ARM64/NVIDIA runtime, checkpoints, repositories, COLMAP,
@@ -303,18 +304,18 @@ for the reliable fallback demo.
 ## Production run and handoff
 
 ```bash
-uv run factoryflow-map --config config/mapper.gb10.toml \
-  run --capture "$FACTORYFLOW_SSD_ROOT/captures/demo" \
-  --out /var/factoryflow/stage/demo.usda
+uv run simbiote-map --config config/mapper.gb10.toml \
+  run --capture "$SIMBIOTE_SSD_ROOT/captures/demo" \
+  --out /var/simbiote/stage/demo.usda
 
-uv run factoryflow-map validate /var/factoryflow/stage/demo.usda
+uv run simbiote-map validate /var/simbiote/stage/demo.usda
 ```
 
 Successful output includes:
 
 - `demo.usda` — Step 2 scene.
 - `demo.scene_graph.json` — planner/query contract.
-- `/var/factoryflow/stage/mapper/<timestamp>/` — stage manifests and evidence.
+- `/var/simbiote/stage/mapper/<timestamp>/` — stage manifests and evidence.
 
 The validator requires meter scale, Y-up coordinates, collision APIs, a navigable floor,
 and at least one graspable object with mass and grasp type. Production validation rejects

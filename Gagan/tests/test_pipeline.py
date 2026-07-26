@@ -4,9 +4,9 @@ import numpy as np
 from PIL import Image
 
 from Gagan.fixtures import capture_dir
-from factoryflow_mapper.config import MapperConfig
-from factoryflow_mapper.pipeline import run_pipeline
-from factoryflow_mapper.usd import validate_map
+from simbiote.mapper.config import MapperConfig
+from simbiote.mapper.pipeline import run_pipeline
+from simbiote.mapper.usd import validate_map
 
 
 def _config(tmp_path: Path, *, mode: str = "proxy") -> MapperConfig:
@@ -37,8 +37,8 @@ def test_proxy_pipeline_exports_step2_contract(capture_dir: Path, tmp_path: Path
     assert output.with_suffix(".scene_graph.json").is_file()
     text = output.read_text(encoding="utf-8")
     assert "PhysicsCollisionAPI" in text
-    assert "factoryflow:is_navigable = true" in text
-    assert "factoryflow:is_graspable = true" in text
+    assert "simbiote:is_navigable = true" in text
+    assert "simbiote:is_graspable = true" in text
 
 
 def test_proxy_is_rejected_for_production_handoff(

@@ -7,16 +7,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from factoryflow_mapper.config import MapperConfig
-from factoryflow_mapper.ingest import load_capture_bundle
-from factoryflow_mapper.stages import (
+from simbiote.mapper.config import MapperConfig
+from simbiote.mapper.ingest import load_capture_bundle
+from simbiote.mapper.stages import (
     build_scene_graph,
     complete_depth,
     label_scene,
     reconstruct,
     refine_poses,
 )
-from factoryflow_mapper.usd import ValidationReport, export_usd, validate_map
+from simbiote.mapper.usd import ValidationReport, export_usd, validate_map
 
 
 @dataclass(frozen=True, slots=True)

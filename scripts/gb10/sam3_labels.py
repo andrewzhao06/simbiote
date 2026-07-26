@@ -1,4 +1,4 @@
-"""Produce FactoryFlow's semantic detections contract from a SAM 3 checkpoint."""
+"""Produce Simbiote's semantic detections contract from a SAM 3 checkpoint."""
 
 from __future__ import annotations
 

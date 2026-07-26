@@ -1,4 +1,4 @@
-"""Command-line interface for FactoryFlow Mapper."""
+"""Command-line interface for the Simbiote mapper."""
 
 from __future__ import annotations
 
@@ -7,15 +7,15 @@ import json
 import sys
 from pathlib import Path
 
-from factoryflow_mapper.config import MapperConfig
-from factoryflow_mapper.doctor import run_doctor, serialize_checks
-from factoryflow_mapper.ingest import load_capture_bundle
-from factoryflow_mapper.pipeline import run_pipeline
-from factoryflow_mapper.usd import validate_map
+from simbiote.mapper.config import MapperConfig
+from simbiote.mapper.doctor import run_doctor, serialize_checks
+from simbiote.mapper.ingest import load_capture_bundle
+from simbiote.mapper.pipeline import run_pipeline
+from simbiote.mapper.usd import validate_map
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="factoryflow-map")
+    parser = argparse.ArgumentParser(prog="simbiote-map")
     parser.add_argument("--config", type=Path, help="Mapper TOML config")
     commands = parser.add_subparsers(dest="command", required=True)
 

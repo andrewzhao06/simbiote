@@ -1,6 +1,6 @@
 # GB10 SSD layout
 
-Mount the drive at a path such as `/mnt/factoryflow-ssd`; all portable assets
+Mount the drive at a path such as `/mnt/simbiote-ssd`; all portable assets
 live below its `AI/` directory.
 
 ```text

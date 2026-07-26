@@ -36,18 +36,16 @@ UPLOAD_PHONE_SCANS_HERE/
 ## Validate after upload
 
 ```powershell
-$env:PYTHONPATH="$PWD\src"
-python -m factoryflow_mapper.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
+simbiote-map ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
 ```
 
 ## Preview locally
 
 ```powershell
-$env:PYTHONPATH="$PWD\src"
-$env:FACTORYFLOW_MODE="preview"
-$env:FACTORYFLOW_WORK_ROOT="$PWD\.local\work"
+$env:SIMBIOTE_MODE="preview"
+$env:SIMBIOTE_WORK_ROOT="$PWD\.local\work"
 
-python -m factoryflow_mapper.cli --config config\mapper.example.toml run `
+simbiote-map --config config\mapper.example.toml run `
   --capture ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough" `
   --out ".\.local\preview.usda"
 ```

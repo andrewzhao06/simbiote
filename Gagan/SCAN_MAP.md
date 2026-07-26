@@ -1,4 +1,4 @@
-# FactoryFlow — Teammate 1: Scan the Environment → 3D Map
+# Simbiote — Teammate 1: Scan the Environment → 3D Map
 
 **Shared context below is historical Teammate 1 planning material.** For the
 current project layout, see `README.md`, `../docs/GB10_DOWNLOADS.md`, and
@@ -8,14 +8,14 @@ current project layout, see `README.md`, `../docs/GB10_DOWNLOADS.md`, and
 
 ## Part 0 — Project Overview
 
-**Project:** FactoryFlow — Offline Platform for Scanning, Simulating & RL-Training Mobile Manipulator Robots
+**Project:** Simbiote — Offline Platform for Scanning, Simulating & RL-Training Mobile Manipulator Robots
 **Target:** Dell × NVIDIA Hackathon "Local AI on Dell Pro Max with GB10," Seattle Tech Week — **July 26, 2026, one-day sprint (9 AM – 9 PM)**
 **Hardware:** Dell Pro Max with GB10 (provided day-of) + team laptops (dev machines) + an iPhone with LiDAR (capture + teleop camera)
 **Team:** 4 people, one per role (see Parts 4–7): **Teammate 1** Scan & Map · **Teammate 2** Isaac Sim, Physics & Training · **Teammate 3** Hand-Tracking Teleoperation · **Teammate 4** Robot Prompting (Agentic Control)
 
-### What FactoryFlow is
+### What Simbiote is
 
-A platform other robotics companies use to train mobile-manipulator robots with reinforcement learning, entirely offline. A robotics company points FactoryFlow at their robot spec and either their own facility (scanned with a phone) or a ready-made environment from a library (a hospital, for this demo), and gets back a robot that's learned to navigate that space without collisions and pick up objects in it — plus a way to remotely operate and further train that same robot with tracked hand movements or plain-language instructions. The whole loop runs air-gapped, on one GB10, in a single sitting.
+A platform other robotics companies use to train mobile-manipulator robots with reinforcement learning, entirely offline. A robotics company points Simbiote at their robot spec and either their own facility (scanned with a phone) or a ready-made environment from a library (a hospital, for this demo), and gets back a robot that's learned to navigate that space without collisions and pick up objects in it — plus a way to remotely operate and further train that same robot with tracked hand movements or plain-language instructions. The whole loop runs air-gapped, on one GB10, in a single sitting.
 
 ### The four roles
 
@@ -165,7 +165,7 @@ All judged compute lives on the GB10 — the phone and laptop are sensor/input d
 
 - `allow_external: false`, `allow_loopback: true`; bind the LAN interface only; whitelist the phone and laptop's IPs, port `8555`.
 - Socket/port-level Landlock scoping requires Landlock ABI v4 (kernel ≥ 6.7). Check DGX OS kernel on day 0; nftables fallback if needed.
-- Filesystem: read-only reconstruction/training weights + environment-library directory; write access only to `/var/factoryflow/stage/` (scanned maps, trained policies, teleop logs).
+- Filesystem: read-only reconstruction/training weights + environment-library directory; write access only to `/var/simbiote/stage/` (scanned maps, trained policies, teleop logs).
 
 ### NemoClaw guardrails
 
@@ -241,7 +241,7 @@ Confidence handling either way: level-2 depth pixels are hard anchors, level-1 s
 ### 4.5 Build spec
 
 ```
-factoryflow/
+simbiote/
 ├── capture_ingest/
 │   └── ingest.py         — def load_capture_bundle(path: str) -> FusedFrames
 │                            Parses the confirmed schema directly (§4.2)

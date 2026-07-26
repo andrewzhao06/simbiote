@@ -30,7 +30,7 @@ ITERATIONS="${DGRUT_ITERATIONS:-7000}"
 
 mkdir -p "$OUTPUT"
 RUNS_DIR="$OUTPUT/runs"
-EXPERIMENT="factoryflow_scene"
+EXPERIMENT="simbiote_scene"
 
 (
   cd "$DGRUT_ROOT"

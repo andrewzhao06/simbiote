@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from factoryflow_mapper.models import SceneGraph, SceneNode
+from simbiote.mapper.models import SceneGraph, SceneNode
 
 
 @dataclass(slots=True)
@@ -55,15 +55,15 @@ def _node_usda(node: SceneNode) -> str:
         f"        double3 xformOp:translate = ({center})",
         f"        float3 xformOp:scale = ({size})",
         '        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]',
-        f"        custom string factoryflow:nodeId = {json.dumps(node.node_id)}",
-        f"        custom string factoryflow:label = {json.dumps(node.label)}",
-        f"        custom string factoryflow:kind = {json.dumps(node.kind)}",
-        f"        custom double factoryflow:confidence = {node.confidence:.8g}",
+        f"        custom string simbiote:nodeId = {json.dumps(node.node_id)}",
+        f"        custom string simbiote:label = {json.dumps(node.label)}",
+        f"        custom string simbiote:kind = {json.dumps(node.kind)}",
+        f"        custom double simbiote:confidence = {node.confidence:.8g}",
     ]
     for key, value in sorted(node.attributes.items()):
         value_type, serialized = _usd_value(value)
         lines.append(
-            f"        custom {value_type} factoryflow:{_identifier(key)} = {serialized}"
+            f"        custom {value_type} simbiote:{_identifier(key)} = {serialized}"
         )
     lines.append("    }")
     return "\n".join(lines)
@@ -87,16 +87,16 @@ def export_usd(graph: SceneGraph, out_path: str | Path) -> Path:
 """
     content = f"""#usda 1.0
 (
-    defaultPrim = "FactoryFlowScene"
+    defaultPrim = "SimbioteScene"
     metersPerUnit = 1
     upAxis = "Y"
 )
 
-def Xform "FactoryFlowScene"
+def Xform "SimbioteScene"
 {{
-    custom string factoryflow:schemaVersion = "{graph.schema_version}"
-    custom string factoryflow:coordinateSystem = "{graph.coordinate_system}"
-    custom bool factoryflow:proxy = {proxy}
+    custom string simbiote:schemaVersion = "{graph.schema_version}"
+    custom string simbiote:coordinateSystem = "{graph.coordinate_system}"
+    custom bool simbiote:proxy = {proxy}
 {geometry_prim}
 
 {nodes}
@@ -121,16 +121,16 @@ def validate_map(path: str | Path, *, allow_proxy: bool = False) -> ValidationRe
         "meters": 'metersPerUnit = 1' in content,
         "up_axis": 'upAxis = "Y"' in content,
         "collision": "PhysicsCollisionAPI" in content,
-        "navigable_floor": "factoryflow:is_navigable = true" in content,
-        "graspable_object": "factoryflow:is_graspable = true" in content,
-        "mass": "factoryflow:mass_kg" in content,
-        "grasp_type": "factoryflow:grasp_type" in content,
+        "navigable_floor": "simbiote:is_navigable = true" in content,
+        "graspable_object": "simbiote:is_graspable = true" in content,
+        "mass": "simbiote:mass_kg" in content,
+        "grasp_type": "simbiote:grasp_type" in content,
         "reconstructed_geometry": (
             'def Xform "ReconstructedGeometry"' in content
             and "prepend references" in content
         ),
     }
-    proxy = "factoryflow:proxy = true" in content
+    proxy = "simbiote:proxy = true" in content
     checks["non_proxy"] = not proxy
     if proxy:
         message = "USD contains proxy geometry, not reconstructed production geometry"

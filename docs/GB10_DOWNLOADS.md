@@ -1,4 +1,4 @@
-# FactoryFlow — GB10 Model Download Checklist (Top-of-Line Edition)
+# Simbiote — GB10 Model Download Checklist (Top-of-Line Edition)
 
 **Get all of this onto the USB drive tonight.** This revises the earlier "safe/small" picks up to the best available option in each category — flagged clearly wherever "best" and "fits in 128 GB alongside everything else" are in tension, so you're choosing with full information, not discovering a conflict tomorrow morning.
 

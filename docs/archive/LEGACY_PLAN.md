@@ -1,19 +1,19 @@
-# FactoryFlow — MASTER REFERENCE (All Steps, Full Tech Stack, 4-Person Team)
+# Simbiote — MASTER REFERENCE (All Steps, Full Tech Stack, 4-Person Team)
 
-**Four people, four roles.** Also split into four teammate-specific files. See `factoryflow_gb10_model_downloads.md` for the download checklist.
+**Four people, four roles.** Also split into four teammate-specific files. See `../GB10_DOWNLOADS.md` for the download checklist.
 
 ---
 
 ## Part 0 — Project Overview
 
-**Project:** FactoryFlow — Offline Platform for Scanning, Simulating & RL-Training Mobile Manipulator Robots
+**Project:** Simbiote — Offline Platform for Scanning, Simulating & RL-Training Mobile Manipulator Robots
 **Target:** Dell × NVIDIA Hackathon "Local AI on Dell Pro Max with GB10," Seattle Tech Week — **July 26, 2026, one-day sprint (9 AM – 9 PM)**
 **Hardware:** Dell Pro Max with GB10 (provided day-of) + team laptops (dev machines) + an iPhone with LiDAR (capture + teleop camera)
 **Team:** 4 people, one per role (see Parts 4–7): **Teammate 1** Scan & Map · **Teammate 2** Isaac Sim, Physics & Training · **Teammate 3** Hand-Tracking Teleoperation · **Teammate 4** Robot Prompting (Agentic Control)
 
-### What FactoryFlow is
+### What Simbiote is
 
-A platform other robotics companies use to train mobile-manipulator robots with reinforcement learning, entirely offline. A robotics company points FactoryFlow at their robot spec and either their own facility (scanned with a phone) or a ready-made environment from a library (a hospital, for this demo), and gets back a robot that's learned to navigate that space without collisions and pick up objects in it — plus a way to remotely operate and further train that same robot with tracked hand movements or plain-language instructions. The whole loop runs air-gapped, on one GB10, in a single sitting.
+A platform other robotics companies use to train mobile-manipulator robots with reinforcement learning, entirely offline. A robotics company points Simbiote at their robot spec and either their own facility (scanned with a phone) or a ready-made environment from a library (a hospital, for this demo), and gets back a robot that's learned to navigate that space without collisions and pick up objects in it — plus a way to remotely operate and further train that same robot with tracked hand movements or plain-language instructions. The whole loop runs air-gapped, on one GB10, in a single sitting.
 
 ### The four roles
 
@@ -163,7 +163,7 @@ All judged compute lives on the GB10 — the phone and laptop are sensor/input d
 
 - `allow_external: false`, `allow_loopback: true`; bind the LAN interface only; whitelist the phone and laptop's IPs, port `8555`.
 - Socket/port-level Landlock scoping requires Landlock ABI v4 (kernel ≥ 6.7). Check DGX OS kernel on day 0; nftables fallback if needed.
-- Filesystem: read-only reconstruction/training weights + environment-library directory; write access only to `/var/factoryflow/stage/` (scanned maps, trained policies, teleop logs).
+- Filesystem: read-only reconstruction/training weights + environment-library directory; write access only to `/var/simbiote/stage/` (scanned maps, trained policies, teleop logs).
 
 ### NemoClaw guardrails
 
@@ -239,7 +239,7 @@ Confidence handling either way: level-2 depth pixels are hard anchors, level-1 s
 ### 4.5 Build spec
 
 ```
-factoryflow/
+simbiote/
 ├── capture_ingest/
 │   └── ingest.py         — def load_capture_bundle(path: str) -> FusedFrames
 │                            Parses the confirmed schema directly (§4.2)
@@ -337,13 +337,13 @@ physics_config = {
 - **Optional stretch:** NVIDIA's Isaac for Healthcare (i4h) asset catalog (`github.com/isaac-for-healthcare/i4h-asset-catalog`) for extra hospital props (trays, carts, equipment).
 
 ```
-factoryflow/robot/
+simbiote/robot/
 └── robot_config.py   — joint names, action limits, default spawn pose,
                          sensor attachment points; same config shape
                          whether it's pointing at a PyBullet URDF today
                          or ridgeback_franka.usd tomorrow
 
-factoryflow/sim_env/
+simbiote/sim_env/
 ├── nav_task.py       — obs = privileged state (pose, nearby obstacles, goal);
 │                        action = base velocity; reward = progress-to-goal,
 │                        collision penalty, smoothness
@@ -357,7 +357,7 @@ factoryflow/sim_env/
 │                        Isaac Sim/PhysX equivalent tomorrow, same signature)
 └── register_envs.py  — registers tasks as Gymnasium envs
 
-factoryflow/training/
+simbiote/training/
 ├── bc_pretrain.py       — def train_bc(trajectories: list[Trajectory], policy_net) -> checkpoint
 │                          NEW: Behavioral Cloning on teleop demos from Step 3's
 │                          demo_logger.export_trajectory() — supervised
@@ -420,7 +420,7 @@ A human operator's tracked hand movements remotely drive the robot's base and ar
 ### 6.2 Shared interface (build/agree on this with Teammate 4 first — you both produce it)
 
 ```
-factoryflow/robot_iface/
+simbiote/robot_iface/
 └── actions.py   — RobotAction(base_velocity: (vx, vy, omega),
                                 arm_target_pose: Pose,
                                 gripper_state: open|closed)
@@ -453,7 +453,7 @@ Setup task for tonight: install the Iriun app on the iPhone and the Iriun deskto
 ### 6.5 Build spec
 
 ```
-factoryflow/teleop/
+simbiote/teleop/
 ├── camera_source.py   — def open_camera(device_index=None) -> FrameSource
 │                        (Iriun Webcam via cv2.VideoCapture; USB preferred)
 ├── hand_tracking.py   — def get_hand_landmarks(frame) -> HandLandmarks
@@ -463,7 +463,7 @@ factoryflow/teleop/
 └── teleop_session.py   — camera_source → hand_tracking → ik_bridge →
                           RobotAction → robot AND demo_logger simultaneously
 
-factoryflow/demo_logger.py  — log_action(action, source: "teleop"|"agentic")
+simbiote/demo_logger.py  — log_action(action, source: "teleop"|"agentic")
                               export_trajectory(session_id) -> Trajectory
                               (shared with Teammate 4 — agree on the schema
                               together, since Step 2 has to ingest both)
@@ -493,7 +493,7 @@ Instead of a human driving every movement, a typed or spoken natural-language in
 ### 6b.2 Shared interface (build/agree on this with Teammate 3 first — you both produce it)
 
 ```
-factoryflow/robot_iface/
+simbiote/robot_iface/
 └── actions.py   — RobotAction(base_velocity: (vx, vy, omega),
                                 arm_target_pose: Pose,
                                 gripper_state: open|closed)
@@ -530,7 +530,7 @@ An LLM can decompose "pick up the tray" into one tool call, but it can't safely 
 ### 6b.5 Build spec
 
 ```
-factoryflow/agentic/
+simbiote/agentic/
 ├── scene_query.py       — list_locations() / list_objects(), reads Step 1's scene graph
 ├── robot_tools.py        — navigate_to(location_id) / pick_up(object_id), and if
 │                          Step 2's wheelchair task lands: approach_wheelchair(id) /
@@ -543,7 +543,7 @@ factoryflow/agentic/
 │                          skill to completion or failure before advancing
 └── agentic_session.py     — parses, runs task_executor, logs to demo_logger
 
-factoryflow/demo_logger.py  — log_action(action, source: "teleop"|"agentic")
+simbiote/demo_logger.py  — log_action(action, source: "teleop"|"agentic")
                               export_trajectory(session_id) -> Trajectory
                               (shared with Teammate 3 — agree on the schema
                               together, since Step 2 has to ingest both)

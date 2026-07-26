@@ -104,8 +104,9 @@ tmp/
 temp/
 .temp/
 .local/
-/var/factoryflow/
+/var/simbiote/
 stage/
+tools/
 
 # --- ML / RL artifacts ---
 checkpoints/

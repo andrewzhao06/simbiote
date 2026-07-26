@@ -11,6 +11,11 @@ numpy>=1.26
 torch>=2.5
 gymnasium>=0.29
 
+# Step 1 -- scan/map ingest (Gagan). Reads captured frames for the COLMAP/
+# 3DGRUT/SAM3 pipeline; the pipeline itself runs as external GB10 tooling
+# (scripts/gb10/*.sh), not a Python dependency.
+Pillow>=10.0
+
 # Physics engine (today). Linux/macOS: `pip install pybullet` just works.
 # Windows: install MSVC Build Tools first, or do this slice of the work in
 # WSL2/a Linux VM/a teammate's Mac. See README.

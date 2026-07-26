@@ -37,15 +37,15 @@ class MapperConfig:
             raise ValueError("Config sections [paths] and [pipeline] must be TOML tables")
 
         def value(name: str, default: str = "") -> str:
-            env_name = f"FACTORYFLOW_{name.upper()}"
+            env_name = f"SIMBIOTE_{name.upper()}"
             return os.getenv(env_name, str(paths.get(name, default)))
 
-        ssd_root = Path(value("ssd_root", "/mnt/factoryflow-ssd/AI")).expanduser()
+        ssd_root = Path(value("ssd_root", "/mnt/simbiote-ssd/AI")).expanduser()
         models_root = Path(value("models_root", str(ssd_root / "models"))).expanduser()
         tools_root = Path(value("tools_root", str(ssd_root / "tools"))).expanduser()
-        work_root = Path(value("work_root", "/var/factoryflow/stage/mapper")).expanduser()
+        work_root = Path(value("work_root", "/var/simbiote/stage/mapper")).expanduser()
 
-        mode = os.getenv("FACTORYFLOW_MODE", str(pipeline.get("mode", "proxy")))
+        mode = os.getenv("SIMBIOTE_MODE", str(pipeline.get("mode", "proxy")))
         if mode not in {"proxy", "preview", "production"}:
             raise ValueError("pipeline.mode must be 'proxy', 'preview', or 'production'")
 
