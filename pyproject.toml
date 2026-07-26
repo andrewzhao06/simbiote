@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simbiote-teammate2"
+version = "0.1.0"
+description = "Simbiote — Teammate 2: Physics, Simulation & Training (Dell x NVIDIA GB10 hackathon)"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = ["simbiote*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "slow: longer-running tests (real PPO convergence, multi-episode rollouts) -- excluded by default via `-m \"not slow\"` in CI-speed runs",
+]

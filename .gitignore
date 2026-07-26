@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments / local tool installs (not part of the repo -- see
+# requirements.txt / README for how to recreate them)
+.venv/
+venv/
+tools/
+
+# Training artifacts produced by running the code locally
+checkpoints/
+var/
+
+# Editor/OS cruft
+.DS_Store
+Thumbs.db
