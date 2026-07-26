@@ -22,5 +22,14 @@ onnx>=1.16
 onnxruntime>=1.18
 onnxscript>=0.1
 
+# Step 3 -- hand-tracking teleop (Sky). opencv/mediapipe are only imported
+# lazily inside simbiote/teleop/*.py, so the rest of the package (sim_env,
+# training, agentic) works fine without them installed.
+opencv-python>=4.9
+mediapipe>=0.10
+
+# Step 4 -- agentic/LLM control (Andrew). Deliberately has no extra runtime
+# dependency beyond stdlib (urllib) -- see simbiote/agentic/llm_backend.py.
+
 # Tests.
 pytest>=8.0

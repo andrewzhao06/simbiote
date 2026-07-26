@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 from simbiote.robot_iface.actions import GripperState, Pose, RobotAction
@@ -21,7 +22,7 @@ def _grasp_trajectory(session_id: str, length: int = 6) -> Trajectory:
             arm_target_pose=Pose(position=(0.1 * t, 0.0, 0.2)),
             gripper_state=GripperState.CLOSED if t > 3 else GripperState.OPEN,
         )
-        steps.append(TrajectoryStep(timestamp=float(t), observation=[0.0] * 17, action=action))
+        steps.append(TrajectoryStep(timestamp=float(t), observation=[0.0] * 17, action=action, source="teleop"))
     return Trajectory(session_id=session_id, source="teleop", task="grasp", steps=steps)
 
 
@@ -41,6 +42,18 @@ def test_task_action_vector_grasp_delta():
     assert abs(vec2[0] - MAX_EE_STEP) < 1e-6
     assert vec2[3] == 1.0  # closed -> 1
     assert abs(new_target2[0] - (new_target[0] + MAX_EE_STEP)) < 1e-6  # running target reflects the clipped delta, not the raw pose
+
+
+def test_task_action_vector_handles_no_arm_command():
+    """A step logged with `arm_target_pose=None` (e.g. a navigate_to leg
+    inside an otherwise grasp-relevant agentic run) must not crash, and must
+    not move the running EE target."""
+    prev = np.array([0.2, 0.0, 0.3], dtype=np.float32)
+    action = RobotAction(base_velocity=(0.5, 0.0, 0.0), arm_target_pose=None, gripper_state=GripperState.OPEN)
+    vec, new_target = task_action_vector(prev, action)
+    assert vec.shape == (4,)
+    assert (vec[:3] == 0).all()
+    assert (new_target == prev).all()
 
 
 def test_trajectories_to_dataset_grasp_shapes():
@@ -76,7 +89,7 @@ def test_train_bc_fits_a_simple_deterministic_target(tmp_path):
             # deterministic linear target the MLP can actually learn
             target = [obs[0] + obs[1], obs[2] * 0.5]
             action = RobotAction(base_velocity=(target[0], target[1], 0.0))
-            steps.append(TrajectoryStep(timestamp=float(t), observation=obs, action=action))
+            steps.append(TrajectoryStep(timestamp=float(t), observation=obs, action=action, source="teleop"))
         trajs.append(Trajectory(session_id=f"lin{i}", source="teleop", task="nav", steps=steps))
 
     out_path = tmp_path / "linear_bc.pt"

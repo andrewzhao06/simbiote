@@ -2,18 +2,31 @@
 
 `demo_logger.py` (Steps 3 & 4) produces these; `bc_pretrain.py` (Step 2)
 consumes them via `ingest_demo()` / `finetune_policy()` (see
-`training/retrain.py`). Settling on this shape is called out in the spec as
-a group conversation, not something to design in isolation — this is
-Teammate 2's proposed concrete version, used here so the training code has
-something real to run against tonight.
+`training/retrain.py`). Settling on this shape was called out in the spec as
+a group conversation, not something to design in isolation -- this is the
+merge of the three teammates' independent proposals once Sky's (teleop) and
+Andrew's (agentic) actual demo-producing code needed to plug into it:
+
+- `observation` / `reward` per step (Suraj's) -- required for `bc_pretrain.py`
+  to treat a step as a trainable (obs, action) pair; teleop/agentic don't
+  have an observation to give yet, so it defaults to `[]` and
+  `bc_pretrain.py` skips steps that don't have one rather than crashing.
+- `source` per step, not just per `Trajectory` (Sky's and Andrew's) -- keeps
+  each logged line self-describing, which matters for the JSONL streaming
+  format in `demo_logger.py` (a session killed mid-run still leaves readable,
+  self-contained records).
+- `skill` / `ok` per step (Andrew's) -- the atomic skill that produced an
+  agentic action (`navigate_to`, `pick_up`, ...; `None` for teleop) and
+  whether the action was accepted without an executor-level error. Purely
+  additive, so old records without these keys still load (default `None`/`True`).
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Literal, Sequence
+from typing import List, Literal, Optional, Sequence
 
 from simbiote.robot_iface.actions import RobotAction
 
@@ -25,40 +38,34 @@ class TrajectoryStep:
     """One (observation, action) pair plus bookkeeping for a single timestep."""
 
     timestamp: float
-    observation: List[float]
     action: RobotAction
+    source: DemoSource
+    observation: List[float] = field(default_factory=list)
     reward: float = 0.0
+    skill: Optional[str] = None
+    ok: bool = True
 
     def to_dict(self) -> dict:
-        d = asdict(self)
-        d["action"] = {
-            "base_velocity": list(self.action.base_velocity),
-            "arm_target_pose": {
-                "position": list(self.action.arm_target_pose.position),
-                "orientation": list(self.action.arm_target_pose.orientation),
-            },
-            "gripper_state": self.action.gripper_state.value,
+        return {
+            "timestamp": self.timestamp,
+            "action": self.action.to_dict(),
+            "source": self.source,
+            "observation": list(self.observation),
+            "reward": self.reward,
+            "skill": self.skill,
+            "ok": self.ok,
         }
-        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "TrajectoryStep":
-        from simbiote.robot_iface.actions import GripperState, Pose
-
-        a = d["action"]
-        action = RobotAction(
-            base_velocity=tuple(a["base_velocity"]),
-            arm_target_pose=Pose(
-                position=tuple(a["arm_target_pose"]["position"]),
-                orientation=tuple(a["arm_target_pose"]["orientation"]),
-            ),
-            gripper_state=GripperState(a["gripper_state"]),
-        )
         return cls(
             timestamp=d["timestamp"],
-            observation=list(d["observation"]),
-            action=action,
+            action=RobotAction.from_dict(d["action"]),
+            source=d["source"],
+            observation=list(d.get("observation", [])),
             reward=d.get("reward", 0.0),
+            skill=d.get("skill"),
+            ok=bool(d.get("ok", True)),
         )
 
 
@@ -74,11 +81,23 @@ class Trajectory:
     def __len__(self) -> int:
         return len(self.steps)
 
+    def __iter__(self):
+        return iter(self.steps)
+
     def observations(self) -> List[List[float]]:
         return [s.observation for s in self.steps]
 
     def action_vectors(self) -> List[tuple]:
         return [s.action.to_vector() for s in self.steps]
+
+    def skills(self) -> List[str]:
+        """Skills in first-appearance order, for a quick sanity read of an
+        agentic run (teleop steps have `skill=None` and are omitted)."""
+        seen: List[str] = []
+        for s in self.steps:
+            if s.skill and s.skill not in seen:
+                seen.append(s.skill)
+        return seen
 
     def to_dict(self) -> dict:
         return {
@@ -126,7 +145,9 @@ def make_toy_trajectory(
         action = RobotAction(
             base_velocity=(rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1)),
         )
-        steps.append(TrajectoryStep(timestamp=float(t), observation=obs, action=action, reward=0.0))
+        steps.append(
+            TrajectoryStep(timestamp=float(t), observation=obs, action=action, source=source, reward=0.0)
+        )
     return Trajectory(session_id=session_id, source=source, task=task, steps=steps)
 
 

@@ -36,6 +36,16 @@ DEFAULT_CHECKPOINT_DIR = Path(__file__).resolve().parent.parent.parent / "checkp
 def task_action_vector(prev_ee_target: Optional[np.ndarray], action) -> Tuple[np.ndarray, np.ndarray]:
     """Project one logged `RobotAction` onto the grasp task's 4-dim action
     (dx, dy, dz, gripper_cmd). Returns (action_vector, new_ee_target)."""
+    if action.arm_target_pose is None:
+        # A step logged with no arm command (e.g. a `navigate_to` leg inside
+        # an otherwise grasp-relevant agentic run) didn't move the arm, so the
+        # running EE target is unchanged and the delta is zero -- not a crash
+        # on `.position` and not a fabricated jump back to the origin.
+        gripper_cmd = 1.0 if action.gripper_state == GripperState.CLOSED else -1.0
+        delta = np.zeros(3, dtype=np.float32)
+        held_target = prev_ee_target if prev_ee_target is not None else np.zeros(3, dtype=np.float32)
+        return np.concatenate([delta, [gripper_cmd]]).astype(np.float32), held_target
+
     target = np.array(action.arm_target_pose.position, dtype=np.float32)
     if prev_ee_target is None:
         delta = np.zeros(3, dtype=np.float32)

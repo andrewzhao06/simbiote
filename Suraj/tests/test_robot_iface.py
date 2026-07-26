@@ -26,16 +26,43 @@ def test_robot_action_vector_roundtrip():
 def test_robot_action_default_is_open_gripper():
     action = RobotAction()
     assert action.gripper_state == GripperState.OPEN
+    assert action.arm_target_pose is None
     assert action.to_vector()[-1] == 0.0
+
+
+def test_robot_action_dict_roundtrip_preserves_none_arm_pose():
+    """A nav-only action's `arm_target_pose=None` must survive the trip --
+    fabricating a pose here would corrupt bc_pretrain.py's training data."""
+    action = RobotAction(base_velocity=(0.6, 0.0, 0.0))
+    restored = RobotAction.from_dict(action.to_dict())
+    assert restored == action
+    assert restored.arm_target_pose is None
+
+
+def test_pose_from_dict_accepts_flat_xyzq_form():
+    """Some scene-graph fixtures use flat x/y/z/qx.. keys rather than the
+    canonical nested position/orientation lists."""
+    flat = Pose.from_dict({"x": 1.0, "y": 2.0, "z": 3.0, "qw": 1.0})
+    assert flat.position == (1.0, 2.0, 3.0)
+    assert flat.x == 1.0 and flat.y == 2.0 and flat.z == 3.0
 
 
 def test_trajectory_step_dict_roundtrip():
     action = RobotAction(base_velocity=(1, 0, 0), gripper_state=GripperState.CLOSED)
-    step = TrajectoryStep(timestamp=1.0, observation=[0.1, 0.2], action=action, reward=0.5)
+    step = TrajectoryStep(timestamp=1.0, observation=[0.1, 0.2], action=action, source="teleop", reward=0.5)
     restored = TrajectoryStep.from_dict(step.to_dict())
     assert restored.observation == step.observation
     assert restored.action.gripper_state == GripperState.CLOSED
     assert restored.reward == 0.5
+    assert restored.source == "teleop"
+
+
+def test_trajectory_step_skill_and_ok_roundtrip():
+    action = RobotAction(base_velocity=(0, 0, 0))
+    step = TrajectoryStep(timestamp=2.0, action=action, source="agentic", skill="navigate_to", ok=False)
+    restored = TrajectoryStep.from_dict(step.to_dict())
+    assert restored.skill == "navigate_to"
+    assert restored.ok is False
 
 
 def test_trajectory_save_and_load(tmp_path):
