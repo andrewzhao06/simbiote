@@ -1,6 +1,7 @@
 # Simbiote — MASTER REFERENCE (All Steps, Full Tech Stack, 4-Person Team)
 
-**Four people, four roles.** Also split into four teammate-specific files. See `simbiote_gb10_model_downloads.md` for the download checklist.
+**Four people, four roles.** See `GB10_DOWNLOADS.md` for the download checklist and
+the teammate READMEs for module-specific instructions.
 
 ---
 

@@ -28,6 +28,10 @@ def _nonempty(path: Path) -> bool:
     return path.is_file() or (path.is_dir() and any(path.iterdir()))
 
 
+def _checkpoint(path: Path, filename: str) -> bool:
+    return path.is_file() or (path / filename).is_file()
+
+
 def _command_output(command: list[str]) -> str:
     try:
         result = subprocess.run(
@@ -67,13 +71,13 @@ def run_doctor(config: MapperConfig) -> list[Check]:
         ),
         Check(
             "depth checkpoint",
-            _nonempty(config.depth_checkpoint),
+            _checkpoint(config.depth_checkpoint, "model.safetensors"),
             str(config.depth_checkpoint),
             required=production,
         ),
         Check(
             "SAM 3 checkpoint",
-            _nonempty(config.sam3_checkpoint),
+            _checkpoint(config.sam3_checkpoint, "sam3.pt"),
             str(config.sam3_checkpoint),
             required=production,
         ),

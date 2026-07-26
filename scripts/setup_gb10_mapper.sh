@@ -41,8 +41,7 @@ config = Path(sys.argv[1])
 root = sys.argv[2]
 text = config.read_text()
 replacements = {
-    "/mnt/factoryflow-ssd": root,
-    f"{root}/tools": f"{root}/repos",
+    "/mnt/factoryflow-ssd/AI": root,
     "/usr/local/bin/colmap": "colmap",
 }
 for source, target in replacements.items():

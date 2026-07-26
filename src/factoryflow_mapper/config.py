@@ -40,7 +40,7 @@ class MapperConfig:
             env_name = f"FACTORYFLOW_{name.upper()}"
             return os.getenv(env_name, str(paths.get(name, default)))
 
-        ssd_root = Path(value("ssd_root", "/mnt/factoryflow")).expanduser()
+        ssd_root = Path(value("ssd_root", "/mnt/factoryflow-ssd/AI")).expanduser()
         models_root = Path(value("models_root", str(ssd_root / "models"))).expanduser()
         tools_root = Path(value("tools_root", str(ssd_root / "tools"))).expanduser()
         work_root = Path(value("work_root", "/var/factoryflow/stage/mapper")).expanduser()

@@ -1,10 +1,49 @@
-# FactoryFlow Mapper (Teammate 1)
+# Simbiote
 
-This repository contains only the Teammate 1 path:
+Simbiote combines all four teammate modules for the GB10 robotics workflow:
 
-`Stray Scanner capture -> pose refinement -> reconstruction -> semantic labels -> scene graph -> physics metadata -> OpenUSD`
+| Owner | Responsibility | Primary code |
+| --- | --- | --- |
+| Gagan | Stray Scanner capture to OpenUSD scene map | `src/factoryflow_mapper/` |
+| Suraj | Simulation, robot interfaces, and policy training | `simbiote/sim_env/`, `simbiote/training/` |
+| Sky | Hand-tracking teleoperation | `simbiote/teleop/` |
+| Andrew | Scene querying and agentic robot control | `simbiote/agentic/` |
 
-It deliberately does not contain robot training, teleoperation, or prompting code.
+Each owner folder contains its README and tests. Run the complete test suite with
+`python -m pytest`.
+
+## Phone scan upload (start here)
+
+Put Stray Scanner exports in:
+
+`UPLOAD_PHONE_SCANS_HERE/`
+
+That folder is the obvious drop zone in this repo. Each scan should be its own
+subfolder with `camera_matrix.csv`, `odometry.csv`, `imu.csv`, `rgb.mp4`,
+`depth/`, and `confidence/`.
+
+```powershell
+# Option A: drag the phone export folder into UPLOAD_PHONE_SCANS_HERE in File Explorer
+
+# Option B: import from anywhere
+python scripts\import_stray_capture.py "C:\path\to\StrayScannerExport" --name hospital-walkthrough
+
+# Optional: also copy onto the SSD for GB10
+python scripts\import_stray_capture.py "C:\path\to\StrayScannerExport" --name hospital-walkthrough --ssd
+```
+
+Then validate:
+
+```powershell
+$env:PYTHONPATH="$PWD\src"
+python -m factoryflow_mapper.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
+```
+
+Project references are organized in:
+- `docs/SIMBIOTE_MASTER_PLAN.md` — full platform plan
+- `docs/GB10_DOWNLOADS.md` — model/download checklist
+- `docs/SSD_LAYOUT.md` — canonical external SSD layout
+- `Gagan/SCAN_MAP.md` — scan-to-map design notes
 
 ## What works now
 
@@ -35,8 +74,8 @@ $env:FACTORYFLOW_MODE="preview"
 $env:FACTORYFLOW_WORK_ROOT="$PWD\.local\work"
 
 python -m factoryflow_mapper.cli --config config/mapper.example.toml run `
-  --capture ".\ab567bedef" `
-  --out ".\.local\ab567bedef-preview.usda"
+  --capture ".\UPLOAD_PHONE_SCANS_HERE\<scan-name>" `
+  --out ".\.local\preview.usda"
 ```
 
 The output references `lidar_preview.usda` under its timestamped work folder.
@@ -45,52 +84,33 @@ floor and graspable-object metadata are development placeholders in this mode.
 
 ## SSD layout
 
-Mount the prepared SSD, then arrange or symlink the downloads like this:
-
-```text
-<ssd>/
-├── models/
-│   ├── depth-anything/
-│   └── sam3/
-├── tools/
-│   └── 3dgrut/
-├── assets/
-│   └── hospital/
-│       └── hospital.usd
-└── captures/
-    └── <scan-name>/
-        ├── camera_matrix.csv
-        ├── odometry.csv
-        ├── imu.csv
-        ├── rgb.mp4
-        ├── depth/
-        └── confidence/
-```
-
-The mapper does not copy large models or captures into Git.
-
-If the SSD already uses the current `AI/` layout, preserve it rather than
-duplicating large downloads:
+The prepared SSD has one canonical `AI/` layout. Do not duplicate models or
+captures inside the Git repository:
 
 ```text
 <SSD>/AI/
 ├── captures/
 ├── models/
 │   ├── depth-anything/
+│   ├── nemotron/
 │   ├── sam3/
-│   └── nemotron/
+│   ├── theia/
+│   └── wilor/
 ├── repos/
 │   ├── 3dgrut/
 │   ├── colmap/
 │   ├── Depth-Anything-3/
-│   └── sam3/
+│   ├── sam3/
+│   ├── IsaacSim/
+│   └── IsaacLab/
 └── assets/
     └── hospital/
         └── hospital.usd
 ```
 
 `scripts/setup_gb10_mapper.sh` detects `<SSD>/AI` automatically and generates
-the GB10 config for this layout.
+the mapper config for this layout. Isaac Sim and Isaac Lab source are staged on
+the SSD, but must be built on the ARM64 GB10.
 
 ## GB10 setup
 
@@ -244,8 +264,8 @@ interfaces rather than mock output:
 2. `run_depth.sh` runs DA3 and writes `exports/mini_npz/results.npz`.
 3. `run_3dgrut.sh` trains the existing `colmap_3dgut` configuration and requires
    its exported USD/USDZ layer.
-4. `run_sam3.sh` uses local `sam3.pt` to turn fixed text prompts into the
-   `detections.json` contract.
+4. `run_sam3.sh` uses local `sam3.pt` from the official `facebook/sam3`
+   repository to turn fixed text prompts into the `detections.json` contract.
 
 Run the setup script, then source its generated environment:
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Produce the mapper detections.json contract from a local SAM 3 checkpoint.
+# Produce the mapper detections.json contract from an official SAM 3 checkpoint.
 set -euo pipefail
 
 if [[ $# -ne 4 ]]; then
@@ -23,8 +23,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   echo "Reconstruction geometry missing: $GEOMETRY" >&2
   exit 1
 }
-[[ -f "$MODEL_DIR/sam3.pt" ]] || {
-  echo "Missing SAM 3 checkpoint: $MODEL_DIR/sam3.pt" >&2
+CHECKPOINT="$MODEL_DIR/sam3.pt"
+[[ -f "$CHECKPOINT" ]] || {
+  echo "Missing SAM 3 checkpoint: $CHECKPOINT" >&2
   exit 1
 }
 [[ -f "$SAM3_ROOT/sam3/model_builder.py" ]] || {
@@ -37,5 +38,5 @@ PYTHONPATH="$SAM3_ROOT${PYTHONPATH:+:$PYTHONPATH}" "$SAM3_PYTHON" \
   "$SCRIPT_DIR/sam3_labels.py" \
   --capture "$CAPTURE" \
   --geometry "$GEOMETRY" \
-  --checkpoint "$MODEL_DIR/sam3.pt" \
+  --checkpoint "$CHECKPOINT" \
   --output "$OUTPUT/detections.json"

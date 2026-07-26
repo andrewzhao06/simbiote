@@ -1,6 +1,8 @@
 # FactoryFlow — Teammate 1: Scan the Environment → 3D Map
 
-**Shared context below is identical across all four teammates' files — skim once, then jump to Part 4 for your work.** See `factoryflow_gb10_model_downloads.md` for the consolidated, top-of-line download checklist.
+**Shared context below is historical Teammate 1 planning material.** For the
+current project layout, see `README.md`, `../docs/GB10_DOWNLOADS.md`, and
+`../docs/SSD_LAYOUT.md`.
 
 ---
 

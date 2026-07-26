@@ -143,6 +143,8 @@ huggingface/
 hf_cache/
 
 # --- Scan & reconstruction data (large) ---
+# Keep the drop-folder README, ignore real phone scan payloads inside it.
+UPLOAD_PHONE_SCANS_HERE/*/
 scans/
 captures/
 raw_scans/

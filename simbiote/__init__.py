@@ -1,6 +1,6 @@
 """Simbiote — Teammate 2 (Step 2): Physics, Simulation & Training.
 
-See simbiote_GIANT_ALL_STEPS.md (Part 5) for the full spec this package
+See docs/SIMBIOTE_MASTER_PLAN.md (Part 5) for the full spec this package
 implements. Package layout:
 
     simbiote/
