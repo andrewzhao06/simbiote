@@ -1,0 +1,2 @@
+# Preserve the scanner's raw CSV export byte layout.
+ab567bedef/odometry.csv -whitespace

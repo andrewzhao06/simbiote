@@ -4,20 +4,47 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simbiote"
-version = "0.2.0"
-description = "Simbiote — offline scan/sim/RL platform for mobile manipulators (Dell x NVIDIA GB10 hackathon): physics/sim/training (Suraj), hand-tracking teleop (Sky), agentic/LLM control (Andrew)"
-requires-python = ">=3.10"
+version = "0.3.0"
+description = "Offline scan, simulation, teleoperation, and agentic control platform for mobile manipulators"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy",
+  "Pillow",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.9",
+  "onnx>=1.16",
+  "onnxruntime>=1.18",
+  "onnxscript>=0.1",
+]
+usd = [
+  "usd-core>=24.11",
+]
 
 [project.scripts]
+factoryflow-map = "factoryflow_mapper.cli:main"
 simbiote-agentic = "simbiote.agentic.agentic_session:main"
 simbiote-teleop = "simbiote.teleop.teleop_session:main"
 
 [tool.setuptools.packages.find]
-include = ["simbiote*"]
+where = [".", "src"]
+include = ["simbiote*", "factoryflow_mapper*"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["Suraj/tests", "Sky/tests", "Andrew/tests"]
+addopts = "-q"
+pythonpath = [".", "src"]
+testpaths = ["Gagan/tests", "Suraj/tests", "Sky/tests", "Andrew/tests"]
 markers = [
-    "slow: longer-running tests (real PPO convergence, multi-episode rollouts) -- excluded by default via `-m \"not slow\"` in CI-speed runs",
+  "slow: longer-running tests (real PPO convergence, multi-episode rollouts) -- excluded by default via `-m \"not slow\"` in CI-speed runs",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
