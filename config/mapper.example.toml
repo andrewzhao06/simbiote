@@ -9,7 +9,7 @@ ffprobe_binary = "/usr/bin/ffprobe"
 depth_checkpoint = "/mnt/factoryflow-ssd/AI/models/depth-anything"
 sam3_checkpoint = "/mnt/factoryflow-ssd/AI/models/sam3"
 dgrut_root = "/mnt/factoryflow-ssd/AI/repos/3dgrut"
-hospital_usd = "/mnt/factoryflow-ssd/AI/assets/hospital/hospital.usd"
+hospital_usd = "/mnt/factoryflow-ssd/AI/assets/isaac-5.1/Isaac/Environments/Hospital/hospital.usd"
 
 [pipeline]
 # Use "proxy" to test capture parsing and the Step 2 USD contract without geometry.

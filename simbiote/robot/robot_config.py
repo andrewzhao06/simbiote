@@ -81,7 +81,9 @@ STAND_IN_CONFIG = RobotConfig(
     engine="pybullet",
     urdf_path=str(ASSETS_DIR / "robots" / "stand_in_robot.urdf"),
     base_link_name="base_link",
-    arm_joint_names=["shoulder_joint", "elbow_joint", "wrist_joint"],
+    # shoulder_yaw_joint first: without a yaw DOF the arm is planar and cannot
+    # reach anything off the x-z plane (see stand_in_robot.urdf).
+    arm_joint_names=["shoulder_yaw_joint", "shoulder_joint", "elbow_joint", "wrist_joint"],
     gripper_joint_names=["left_finger_joint", "right_finger_joint"],
     ee_link_name="ee_link",
     arm_base_link_name="arm_base_link",
@@ -93,13 +95,20 @@ STAND_IN_CONFIG = RobotConfig(
 # ---------------------------------------------------------------------------
 # Tomorrow: Clearpath Ridgeback + Franka Panda, Isaac Sim built-in asset
 # (§5.4 — `RidgebackFranka/ridgeback_franka.usd`, no custom authoring needed).
-# Joint names below match the published ridgeback_franka.usd articulation;
-# confirm against the loaded stage on the GB10 before first use.
+#
+# Joint/link names below were verified against the articulation as actually
+# loaded on the GB10 (see Suraj/check_isaac_hospital.py): 12 DOF total, made up
+# of 3 dummy planar base joints + panda_joint1..7 + 2 fingers.
+#
+# `usd_path` is relative to Isaac Sim's asset root, not absolute: resolve it
+# with `isaacsim.storage.native.get_assets_root_path()`. It previously pointed
+# at `omniverse://localhost/.../Isaac/4.0/...`, which needs a local Nucleus
+# server that does not exist on this box and pins a stale asset version.
 # ---------------------------------------------------------------------------
 RIDGEBACK_FRANKA_CONFIG = RobotConfig(
     name="ridgeback_franka",
     engine="isaac_sim",
-    usd_path="omniverse://localhost/NVIDIA/Assets/Isaac/4.0/Isaac/Robots/Clearpath/RidgebackFranka/ridgeback_franka.usd",
+    usd_path="/Isaac/Robots/Clearpath/RidgebackFranka/ridgeback_franka.usd",
     base_link_name="base_link",
     arm_joint_names=[
         "panda_joint1", "panda_joint2", "panda_joint3",

@@ -56,3 +56,176 @@ skip cleanly on Windows, where `pybullet` has no PyPI wheel.
 - Export trained checkpoints for `skills.py` to load on the GB10.
 - Verify parallel-env seeding and workspace-radius clipping still hold at
   Isaac Sim's higher fidelity.
+
+## Running the RL policies (PyBullet tier)
+
+```bash
+source Gagan/env.gb10.sh
+
+# navigation
+$FF_PY -m simbiote.training.train_nav --num_envs 8 --timesteps 80000 \
+    --out checkpoints/nav_ppo.pt
+$FF_PY -m simbiote.training.play --checkpoint checkpoints/nav_ppo.pt \
+    --task nav --episodes 30          # --gui to watch
+
+# grasp: BC from scripted demos first, PPO cannot find this one cold
+$FF_PY Suraj/oracle_demos.py --episodes 60 --out checkpoints/grasp_bc.pt
+$FF_PY -m simbiote.training.play --checkpoint checkpoints/grasp_bc.pt \
+    --task grasp --episodes 30
+```
+
+**Grasp: use the BC checkpoint.** PPO from a cold start never finds the lift
+(peaks ~4%), and PPO fine-tuning *on top of* BC actively destroys it — measured
+going 0.19 → 0.26 → 0.00 by update 8 and never recovering. BC alone scores 71%,
+matching the scripted demonstrator it learned from. Fine-tuning needs a lower
+learning rate or a KL penalty against the BC policy before it is worth running.
+
+Both trainers now keep the **best** checkpoint rather than the last, scored on
+success rate (falling back to mean return before any episode finishes).
+Previously a run that peaked and then collapsed silently saved the collapsed
+weights while the log still showed it had once worked.
+
+### Both tasks were unwinnable; that is fixed
+
+Worth knowing, because in each case the training curve looked plausible while
+the objective was unreachable:
+
+- **NavEnv** placed obstacles and goals by unconstrained uniform draw. With the
+  robot issuing a zero action, 23% of episodes collided on step 1 (nearest
+  obstacle spawned 0.04 m away) and 3% started inside the goal — about a
+  quarter of any measured success rate was decided at reset. `reset()` now
+  rejection-samples against `spawn_clearance`, `obstacle_spacing`,
+  `min_goal_distance` and `goal_clearance`. This is also the most likely cause
+  of `test_ppo_improves_nav_success_rate_over_random_baseline` being flaky.
+- **The stand-in arm was planar.** `shoulder_joint` and `elbow_joint` both had
+  axis `(0 1 0)` (the wrist's Z roll is at the chain's end and only spins the
+  gripper), so the EE's world y was pinned at exactly 0.000 while GraspEnv
+  spawns objects at y ∈ [-0.2, 0.2]. Added `shoulder_yaw_joint`.
+- **`GRASP_DIST_THRESHOLD` was tighter than the collision geometry allows.**
+  0.03 m object half-extent plus a 0.04×0.08×0.04 `ee_link` puts the floor on
+  centre-to-centre distance around 0.05–0.07 m; the threshold was 0.06 m. A
+  scripted oracle pressing into the object bottomed out at 0.061 m and never
+  triggered a grasp. Now 0.10 m.
+- **IK solved cold every step.** With the added yaw the arm is redundant, so
+  the solver hopped between branches and the arm thrashed. Now seeded with the
+  current configuration via the null-space form (limits + ranges + rest poses
+  together — passing `currentPositions` alone is silently ignored).
+
+`Suraj/tests/test_env_solvability.py` guards all of this, including a scripted
+oracle that must actually complete the grasp. A success rate converging to zero
+is indistinguishable from "needs more timesteps" unless something asserts the
+task is winnable at all.
+
+## Isaac Sim bring-up — `check_isaac_hospital.py`
+
+Proves the substrate before any of the above: hospital scene loads with real
+colliders, the Ridgeback+Franka articulation initialises, and both the base and
+the arm track commands under PhysX 5.
+
+```bash
+/home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
+    Suraj/check_isaac_hospital.py          # --gui to watch
+```
+
+Expect it to take several minutes: PhysX cooks collision meshes for the whole
+76 x 42 m environment on the first run.
+
+To look at it rather than assert on it:
+
+```bash
+/home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
+    Suraj/view_isaac_hospital.py           # --play to run physics
+```
+
+Same asset resolution, anchor and spawn point as the check, so what you see is
+what the checks ran against. Give the viewport ~90 s after the window appears —
+RTX streams the hospital's materials in gradually and the view is blank white
+until it finishes, which looks like a broken camera but is not.
+
+### Things the asset does that will bite you
+
+**You must pin the `world` link yourself, or the robot never moves.** The chain
+is `world -> dummy_base_x -> dummy_base_y -> base_link`, and the asset ships no
+joint anchoring `world` to the static frame. Left alone the articulation is
+floating-base, so driving `dummy_base_prismatic_x_joint` to +1 m slides the
+*anchor* to −1 m and leaves `base_link` and the whole arm exactly where they
+were. Every command reports success and the robot goes nowhere — measured:
+
+```
+              unanchored              anchored
+world         delta [-1, 0, 0]        delta [0, 0, 0]
+dummy_base_x  delta [ 0, 0, 0]        delta [1, 0, 0]
+base_link     delta [ 0, 0, 0]        delta [1, 0, 0]
+panda_link0   delta [ 0, 0, 0]        delta [1, 0, 0]
+```
+
+The fix is one prim:
+
+```python
+anchor = UsdPhysics.FixedJoint.Define(stage, "/base_anchor")
+anchor.CreateBody1Rel().SetTargets([f"{robot_path}/world"])
+```
+
+Follow-on consequences once anchored:
+
+- The robot cannot tip over or fall through the floor. Reward terms that
+  penalise toppling are dead code here.
+- `articulation.get_world_pose()` returns the **anchor**, which never moves.
+  Read the base pose from `base_link` instead, or you will train a nav policy
+  against a position that is always the spawn point.
+- The base is a 3-DOF planar joint (prismatic x/y + revolute z), not four
+  mecanum wheels — nav actions map straight to base velocities, no wheel IK.
+- **Do not hardcode DOF indices.** Adding the anchor reordered them
+  (`dummy_base_prismatic_x_joint` moved from index 9 to 0). Always resolve via
+  `get_dof_index(name)`.
+
+**The base position drive is stiff enough to bulldoze through walls.**
+Measured: commanded 10 m along X from a clear spawn, the base travelled the
+full 10.00 m straight through the building. At ~1e7 stiffness the drive simply
+overpowers contact. So **the physics will not enforce collision avoidance for
+you** — it has to come from the nav reward, or you lower the base drive
+stiffness / switch to velocity control. `check_isaac_hospital.py` runs this
+test every time and reports which way it went.
+
+**Spawn points need a clearance test, not just a floor tile.** The hospital has
+785 prims sitting in the robot's height band (z 0.15–1.6 m). Spawning at the
+centre of a floor tile put the robot inside a prop: contact jammed the base
+joints at −0.31 m before the first command, then *every* drive test failed —
+base and arm alike — which reads exactly like broken drives rather than a bad
+spawn. Intersect candidate points against those prim bounds and require ~1.2 m
+of clearance. `(7.81, 8.25)` has 2.75 m and is the default in the script.
+
+**Assets resolve through Isaac Sim's own asset root**, not hardcoded paths.
+`check_isaac_hospital.py` calls `get_assets_root_path()` and composes
+`/Isaac/Environments/Hospital/hospital.usd` and
+`/Isaac/Robots/Clearpath/RidgebackFranka/ridgeback_franka.usd` onto it.
+
+Two things about that root on this box:
+
+- Out of the box it is an **S3 URL**, so every asset streams over the network —
+  which the event is explicitly air-gapped against. Setting it in
+  `user.config.json` is *not* enough: `isaacsim.storage.native`'s
+  `config/extension.toml` declares
+  `persistent.isaac.asset_root.default` as an extension setting, and that wins
+  over the user config. It has been repointed there to
+  `/home/dell/AI/assets/isaac-5.1` (original kept as `extension.toml.bak`).
+  Since that is a vendored NVIDIA file, an Isaac Sim reinstall will revert it —
+  `check_isaac_hospital.py` therefore also detects a remote root at runtime,
+  falls back to the local pack, and says so.
+- The pack was a **partial download**: `Isaac/Environments/Hospital` and
+  `Isaac/Robots/Clearpath` only, with no `/NVIDIA` tree, so the hospital's dome
+  light silently had no sky texture. The missing HDR has been fetched. The
+  script now resolves every asset-valued attribute on the stage and fails if
+  any is unresolved, rather than letting it degrade quietly.
+
+Never point at a *symlinked copy* of `hospital.usd`: USD resolves the scene's
+relative `./Props` and `./Materials` references against the link's own
+directory, so a bare file symlink loads a hospital with no walls and the robot
+drives straight through the building. The check counts `Geo_` prims
+(expect ~1064) as the canary.
+
+**Coordinate conventions differ between the two environments.** `hospital.usd`
+is Z-up, so PhysX's default -Z gravity is already right. Teammate 1's scanned
+scenes are Y-up per the Step 2 contract, and there Isaac Sim silently gives you
+-Z gravity unless you re-assert the up axis after `initialize_physics()` — see
+`Gagan/README.md`.

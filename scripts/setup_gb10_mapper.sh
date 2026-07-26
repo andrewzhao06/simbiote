@@ -28,7 +28,7 @@ nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
 
 sudo install -d -m 0775 "$WORK_ROOT"
 sudo chown "$USER":"$(id -gn)" "$WORK_ROOT"
-mkdir -p "$AI_ROOT/captures" "$AI_ROOT/assets/hospital"
+mkdir -p "$AI_ROOT/captures" "$AI_ROOT/assets"
 chmod +x "$REPO_ROOT/scripts/gb10/"*.sh
 
 CONFIG="$REPO_ROOT/config/mapper.gb10.toml"

@@ -256,7 +256,15 @@ class CheckpointBackend:
             loc = scene.get_location(loc_id)
             if loc is None:
                 return SkillResult(False, f"unknown location {loc_id!r}")
-            locations = {loc_id: (loc.pose.x, loc.pose.y)}
+            # Pass every location, not just the requested one: navigate_to
+            # rescales the scene into the nav arena and needs the whole set to
+            # compute that mapping. Handing it a single point would make the
+            # scale depend on which place was asked for.
+            locations = {
+                other.id: (other.pose.x, other.pose.y)
+                for other in scene.list_locations()
+            }
+            locations.setdefault(loc_id, (loc.pose.x, loc.pose.y))
             info = robot_skills.navigate_to(
                 loc_id, checkpoint_path=self.nav_checkpoint, locations=locations, gui=self.gui
             )

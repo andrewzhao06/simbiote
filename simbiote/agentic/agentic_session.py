@@ -110,7 +110,14 @@ def run_session(
         },
         stage=stage,
     )
-    result.trajectory = demo_logger.export_trajectory(session_id, stage=stage)
+    try:
+        result.trajectory = demo_logger.export_trajectory(session_id, stage=stage)
+    except KeyError:
+        # A plan that fails on its first skill never emits an action, so no
+        # session file exists to export. That is a failed run, not a broken
+        # one -- surface it through result.report like any other failure
+        # instead of crashing the CLI with a traceback mid-demo.
+        result.trajectory = None
     return result
 
 

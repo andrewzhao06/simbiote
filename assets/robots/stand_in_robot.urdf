@@ -68,8 +68,17 @@
     <origin xyz="-0.2 -0.22 -0.05" rpy="1.5708 0 0"/>
   </joint>
 
-  <!-- Arm: 3-DOF (shoulder pitch, elbow pitch, wrist roll) -- enough reach
-       for p.calculateInverseKinematics to solve a 3D EE target usefully. -->
+  <!-- Arm: 4-DOF (shoulder YAW, shoulder pitch, elbow pitch, wrist roll).
+       The yaw joint is load-bearing, not decoration. Without it the only two
+       positioning joints (shoulder + elbow) both rotate about Y, so the whole
+       arm is planar: the end-effector's world y is pinned at exactly 0.000 and
+       cannot track a target off the x-z plane. GraspEnv spawns objects at
+       y in [-0.2, 0.2], well outside the 0.06 m attach threshold, so grasping
+       was geometrically impossible -- a scripted oracle driving the EE straight
+       at the object never got closer than 0.105 m, and PPO sat at 0.00 success
+       for 60k timesteps because there was no success to find.
+       (wrist_joint's Z axis is at the end of the chain: it spins the gripper,
+       it does not translate the EE.) -->
   <link name="arm_base_link">
     <inertial><mass value="1.0"/><inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/></inertial>
     <visual><geometry><cylinder radius="0.05" length="0.08"/></geometry><material name="arm_orange"/></visual>
@@ -80,14 +89,26 @@
     <origin xyz="0.15 0 0.11" rpy="0 0 0"/>
   </joint>
 
+  <link name="shoulder_yaw_link">
+    <inertial><mass value="0.3"/><inertia ixx="0.002" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.002"/></inertial>
+    <visual><geometry><cylinder radius="0.04" length="0.04"/></geometry><material name="arm_orange"/></visual>
+    <collision><geometry><cylinder radius="0.04" length="0.04"/></geometry></collision>
+  </link>
+  <joint name="shoulder_yaw_joint" type="revolute">
+    <parent link="arm_base_link"/><child link="shoulder_yaw_link"/>
+    <origin xyz="0 0 0.06" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="50" velocity="2.0"/>
+  </joint>
+
   <link name="shoulder_link">
     <inertial><mass value="0.8"/><inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.005"/></inertial>
     <visual><origin xyz="0.15 0 0"/><geometry><cylinder radius="0.03" length="0.3"/></geometry><material name="arm_orange"/></visual>
     <collision><origin xyz="0.15 0 0"/><geometry><cylinder radius="0.03" length="0.3"/></geometry></collision>
   </link>
   <joint name="shoulder_joint" type="revolute">
-    <parent link="arm_base_link"/><child link="shoulder_link"/>
-    <origin xyz="0 0 0.06" rpy="0 0 0"/>
+    <parent link="shoulder_yaw_link"/><child link="shoulder_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="-1.57" upper="1.57" effort="50" velocity="2.0"/>
   </joint>

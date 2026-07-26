@@ -58,6 +58,14 @@ def main(argv=None) -> Path:
         print("[train_grasp] no --checkpoint given, starting from a fresh random policy")
 
     config = PPOConfig(total_timesteps=args.timesteps, seed=args.seed)
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Keep the best policy, not the last one. PPO fine-tuning off a BC warm
+    # start can peak early and then collapse -- observed here going 0.26 -> 0.00
+    # and staying there -- and saving only the final weights silently ships the
+    # collapsed policy while the log shows the run once worked.
+    best = {"score": float("-inf"), "update": 0}
 
     def progress(stats: dict) -> None:
         print(
@@ -65,12 +73,24 @@ def main(argv=None) -> Path:
             f"mean_return={stats['mean_episode_return']:.2f} success_rate={stats['success_rate']:.2f} "
             f"episodes={stats['num_episodes']}"
         )
+        score = stats["success_rate"]
+        if score != score:  # NaN: no episode finished this update
+            score = stats["mean_episode_return"]
+        if score == score and score > best["score"]:
+            best.update(score=float(score), update=int(stats["update"]))
+            # train_ppo mutates `policy` in place, so this is the live network.
+            policy.save(out_path)
 
     trained = train_ppo([make_env_fn(i) for i in range(args.num_envs)], policy, config, progress_callback=progress)
 
-    out_path = Path(args.out)
-    trained.save(out_path)
-    print(f"[train_grasp] saved checkpoint to {out_path}")
+    if best["score"] == float("-inf"):
+        trained.save(out_path)
+        print(f"[train_grasp] saved checkpoint to {out_path}")
+    else:
+        print(
+            f"[train_grasp] saved best checkpoint to {out_path} "
+            f"(update {best['update']}, score {best['score']:.2f})"
+        )
     return out_path
 
 

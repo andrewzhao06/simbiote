@@ -72,10 +72,20 @@ require_dir "SAM 3 checkout" "$AI_ROOT/repos/sam3"
 require_dir "COLMAP checkout" "$AI_ROOT/repos/colmap"
 require_dir "Capture directory" "$AI_ROOT/captures"
 
-if [[ -f "$AI_ROOT/assets/hospital/hospital.usd" ]]; then
+ISAAC_PACK="$AI_ROOT/assets/isaac-5.1"
+HOSPITAL_USD="$ISAAC_PACK/Isaac/Environments/Hospital/hospital.usd"
+if [[ -f "$HOSPITAL_USD" ]]; then
   pass "Hospital fallback asset"
 else
-  warn "Hospital fallback asset missing: $AI_ROOT/assets/hospital/hospital.usd"
+  warn "Hospital fallback asset missing: $HOSPITAL_USD"
+fi
+
+# The pack shipped without the /NVIDIA tree, so the hospital's dome-light sky
+# silently failed to load. Cheap to check, annoying to diagnose in a viewport.
+if [[ -f "$ISAAC_PACK/NVIDIA/Assets/Skies/Cloudy/abandoned_parking_4k.hdr" ]]; then
+  pass "Isaac pack /NVIDIA sky assets"
+else
+  warn "Isaac pack is missing /NVIDIA/Assets/Skies — the hospital dome light will not render"
 fi
 
 require_command ffmpeg

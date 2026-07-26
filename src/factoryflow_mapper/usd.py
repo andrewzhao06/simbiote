@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -77,9 +78,23 @@ def export_usd(graph: SceneGraph, out_path: str | Path) -> Path:
     geometry_path = graph.metadata.get("geometry_path")
     geometry_prim = ""
     if isinstance(geometry_path, str) and geometry_path:
-        asset_path = Path(geometry_path).resolve().as_posix()
+        # The reconstruction stage writes its layer into a timestamped work
+        # directory. Referencing that absolute path would leave Step 2 holding a
+        # .usd that breaks as soon as the stage is cleaned or the scene is
+        # copied to another box, so publish the layer alongside the output and
+        # reference it relatively.
+        source = Path(geometry_path).resolve()
+        published = output.with_suffix("").with_suffix(f".geometry{source.suffix}")
+        if source != published:
+            shutil.copyfile(source, published)
+        asset_path = f"./{published.name}"
+        # Typeless `def` on purpose: an authored type (e.g. Xform) wins over the
+        # referenced layer's type, which would leave the composed prim carrying
+        # the `points` data while failing UsdGeom.Points/Boundable -- an empty
+        # world bound and nothing rendered. Leaving it typeless lets the
+        # referenced Points type flow through so the cloud is actually visible.
         geometry_prim = f"""
-    def Xform "ReconstructedGeometry" (
+    def "ReconstructedGeometry" (
         prepend references = @{asset_path}@
     )
     {{
@@ -126,8 +141,7 @@ def validate_map(path: str | Path, *, allow_proxy: bool = False) -> ValidationRe
         "mass": "factoryflow:mass_kg" in content,
         "grasp_type": "factoryflow:grasp_type" in content,
         "reconstructed_geometry": (
-            'def Xform "ReconstructedGeometry"' in content
-            and "prepend references" in content
+            'def "ReconstructedGeometry"' in content and "prepend references" in content
         ),
     }
     proxy = "factoryflow:proxy = true" in content

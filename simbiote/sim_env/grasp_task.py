@@ -41,7 +41,14 @@ ACT_DIM = 4  # dx, dy, dz (EE delta), gripper_cmd in [-1, 1]
 
 MAX_EE_STEP = 0.03  # m per action, keeps IK targets from jumping unrealistically
 LIFT_HEIGHT = 0.12  # m above spawn height counts as "lifted" (success)
-GRASP_DIST_THRESHOLD = 0.06  # m, how close EE must be to trigger attach()
+# m, how close the EE must be to trigger attach(). Measured against the actual
+# collision geometry rather than picked: the graspable box is 0.03 m half-extent
+# and ee_link is a 0.04 x 0.08 x 0.04 box, so once the gripper is flush against
+# the object the centre-to-centre distance still cannot drop below ~0.05-0.07 m
+# depending on approach axis. At the old 0.06 m a scripted oracle pressing the
+# EE into the object bottomed out at 0.061 m and never triggered a grasp, so
+# nothing could ever succeed.
+GRASP_DIST_THRESHOLD = 0.10
 
 
 class GraspEnv(gym.Env if gym is not None else object):
@@ -168,16 +175,43 @@ class GraspEnv(gym.Env if gym is not None else object):
     def _drive_arm_to_target(self) -> None:
         import pybullet as p
 
-        # Position-only IK: this 3-DOF stand-in arm (shoulder pitch, elbow
-        # pitch, wrist roll) doesn't have enough DOF to also track a fixed
-        # end-effector orientation without fighting the position target --
-        # matches spec §5.4's "don't chase accuracy" framing for the
+        # Position-only IK: this stand-in arm doesn't have enough DOF to also
+        # track a fixed end-effector orientation without fighting the position
+        # target -- matches spec §5.4's "don't chase accuracy" framing for the
         # stand-in; tomorrow's 7-DOF Franka arm has DOF to spare for both.
+        #
+        # `currentPositions` matters: the arm has a yaw joint plus two pitch
+        # joints, so a given EE position has more than one solution. Solving
+        # cold each step lets the solver hop between branches and the arm
+        # thrashes -- commanding a target at y=0 could leave the EE at y=0.58.
+        # Seeding from the current configuration keeps successive solutions
+        # continuous.
+        # PyBullet only uses the seeded/null-space solver when limits, ranges
+        # and rest poses are all supplied -- passing currentPositions on its own
+        # is silently ignored.
+        indices = self._handles.dof_joint_indices
+        current = [
+            state[0]
+            for state in p.getJointStates(self._robot_id, indices, physicsClientId=self._client)
+        ]
+        lower, upper = [], []
+        for joint_index in indices:
+            info = p.getJointInfo(self._robot_id, joint_index, physicsClientId=self._client)
+            joint_lower, joint_upper = info[8], info[9]
+            if joint_upper < joint_lower:  # unlimited joint
+                joint_lower, joint_upper = -math.pi, math.pi
+            lower.append(joint_lower)
+            upper.append(joint_upper)
         joint_angles = p.calculateInverseKinematics(
             self._robot_id,
             self._handles.ee_link_index,
             targetPosition=self._ee_target.tolist(),
-            maxNumIterations=100,
+            lowerLimits=lower,
+            upperLimits=upper,
+            jointRanges=[u - l for l, u in zip(lower, upper)],
+            restPoses=current,
+            jointDamping=[0.05] * len(indices),
+            maxNumIterations=200,
             residualThreshold=1e-4,
             physicsClientId=self._client,
         )

@@ -50,6 +50,10 @@ class NavEnv(gym.Env if gym is not None else object):
         gui: bool = False,
         seed: Optional[int] = None,
         goal_override: Optional[Tuple[float, float]] = None,
+        spawn_clearance: float = 0.6,
+        obstacle_spacing: float = 0.5,
+        min_goal_distance: float = 1.0,
+        goal_clearance: float = 0.4,
     ):
         if gym is None:
             raise ImportError("gymnasium is required for NavEnv (pip install gymnasium)")
@@ -60,6 +64,11 @@ class NavEnv(gym.Env if gym is not None else object):
         self.max_steps = max_steps
         self.sim_steps_per_action = sim_steps_per_action
         self.goal_threshold = goal_threshold
+        # Episode-validity margins (metres). See reset() for why these exist.
+        self.spawn_clearance = spawn_clearance
+        self.obstacle_spacing = obstacle_spacing
+        self.min_goal_distance = min_goal_distance
+        self.goal_clearance = goal_clearance
         self.gui = gui
         self._rng = random.Random(seed)
         # Set by robot_iface/skills.py's navigate_to() to target a real scene
@@ -84,6 +93,23 @@ class NavEnv(gym.Env if gym is not None else object):
 
     # -- Gymnasium API --------------------------------------------------
 
+    def _sample_xy(self, wall_half: float, acceptable, attempts: int = 200) -> Tuple[float, float]:
+        """Uniform sample inside the arena that satisfies `acceptable`.
+
+        Falls back to the last draw rather than looping forever: a small room
+        with many obstacles can be genuinely over-constrained, and a degraded
+        episode beats a hung training run.
+        """
+        candidate = (0.0, 0.0)
+        for _ in range(attempts):
+            candidate = (
+                self._rng.uniform(-wall_half, wall_half),
+                self._rng.uniform(-wall_half, wall_half),
+            )
+            if acceptable(candidate):
+                return candidate
+        return candidate
+
     def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None):
         if seed is not None:
             self._rng = random.Random(seed)
@@ -97,13 +123,60 @@ class NavEnv(gym.Env if gym is not None else object):
         self._wall_ids = scene.build_stand_in_arena(self._client, room_size=self.room_size)
         self._robot_id = scene.load_robot(self.robot_config, self._client)
 
+        # Obstacles and the goal are rejection-sampled rather than placed by a
+        # bare uniform draw. Unconstrained, ~23% of episodes spawned an obstacle
+        # on top of the robot (nearest seen: 0.04 m) and terminated with a
+        # collision on step 1, and another ~3% put the goal inside the success
+        # threshold for a free win -- so roughly a quarter of every success rate
+        # measured was decided at reset, before the policy acted at all.
+        spawn_xy = (self.robot_config.default_spawn_pose.position[0],
+                    self.robot_config.default_spawn_pose.position[1])
+
+        # A caller-supplied goal (skills.navigate_to targeting a named scene
+        # location) is known up front, so obstacles must also keep clear of it.
+        # Otherwise one can spawn right on the destination and the robot
+        # collides a few tens of centimetres short -- which is what "go to the
+        # supply room" looked like: reached 0.55 m out, then hit a box.
+        fixed_goal = tuple(self.goal_override) if self.goal_override else None
+
+        def _far_enough(candidate, placed) -> bool:
+            if math.hypot(candidate[0] - spawn_xy[0], candidate[1] - spawn_xy[1]) < self.spawn_clearance:
+                return False
+            if fixed_goal is not None and math.hypot(
+                candidate[0] - fixed_goal[0], candidate[1] - fixed_goal[1]
+            ) < self.goal_clearance:
+                return False
+            return all(
+                math.hypot(candidate[0] - other[0], candidate[1] - other[1]) >= self.obstacle_spacing
+                for other in placed
+            )
+
         self._obstacle_ids = []
+        placed_xy: List[Tuple[float, float]] = []
         for _ in range(self.num_obstacles):
-            pos = (self._rng.uniform(-wall_half, wall_half), self._rng.uniform(-wall_half, wall_half), 0.2)
-            obj = scene.spawn_graspable_box(self._client, pos, half_extents=(0.15, 0.15, 0.2), mass_kg=0.0, rgba=(0.3, 0.3, 0.9, 1.0))
+            xy = self._sample_xy(wall_half, lambda c: _far_enough(c, placed_xy))
+            placed_xy.append(xy)
+            obj = scene.spawn_graspable_box(
+                self._client, (xy[0], xy[1], 0.2), half_extents=(0.15, 0.15, 0.2),
+                mass_kg=0.0, rgba=(0.3, 0.3, 0.9, 1.0),
+            )
             self._obstacle_ids.append(obj.body_id)
 
-        self._goal_xy = self.goal_override or (self._rng.uniform(-wall_half, wall_half), self._rng.uniform(-wall_half, wall_half))
+        if self.goal_override:
+            self._goal_xy = self.goal_override
+        else:
+            # Far enough from the spawn that reaching it is an actual traverse,
+            # and clear of the obstacles so it is reachable at all.
+            self._goal_xy = self._sample_xy(
+                wall_half,
+                lambda c: (
+                    math.hypot(c[0] - spawn_xy[0], c[1] - spawn_xy[1]) >= self.min_goal_distance
+                    and all(
+                        math.hypot(c[0] - o[0], c[1] - o[1]) >= self.goal_clearance
+                        for o in placed_xy
+                    )
+                ),
+            )
         self._prev_action = np.zeros(ACT_DIM, dtype=np.float32)
         self._step_count = 0
         self._prev_dist = self._goal_distance()

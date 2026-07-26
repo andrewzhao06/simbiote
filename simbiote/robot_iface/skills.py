@@ -91,21 +91,69 @@ def _rollout(env, infer_fn: Callable[[np.ndarray], np.ndarray], max_steps: int) 
     return info
 
 
+def fit_locations_to_arena(
+    locations: Dict[str, Tuple[float, float]],
+    room_size: float = 4.0,
+    margin: float = 0.6,
+) -> Dict[str, Tuple[float, float]]:
+    """Map scene-graph world coordinates into the nav arena, preserving layout.
+
+    Step 1's scene graph is in real building coordinates -- the hospital
+    fixture spans about 10 x 13 m -- while `NavEnv` is a 4 x 4 m arena with
+    walls at +/-1.8 and a policy trained on goals no further than ~2.4 m away.
+    Feeding a raw world coordinate through `goal_override` puts the goal
+    *outside the walls*, so the robot drives into one and the skill reports a
+    collision (measured: nurse_station came out 6.17 m away).
+
+    Scaling is uniform and about the scene's centre, so relative bearings
+    survive: the supply room stays diagonally opposite the nurse station. This
+    is a stand-in-tier fix -- the Isaac Sim port navigates the real hospital at
+    true scale and won't need it.
+
+    `margin` buys clearance from the arena walls. It is generous on purpose:
+    at 0.3 the mapped corners landed 0.3 m from a wall and the approach clipped
+    it, which showed up as "go to the supply room" failing on collision while
+    the centre-ish destinations passed.
+    """
+    if not locations:
+        return {}
+    usable = max(room_size / 2.0 - margin - 0.2, 0.1)
+    xs = [xy[0] for xy in locations.values()]
+    ys = [xy[1] for xy in locations.values()]
+    centre_x, centre_y = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    half_x, half_y = (max(xs) - min(xs)) / 2, (max(ys) - min(ys)) / 2
+    reach = max(half_x, half_y)
+    scale = 1.0 if reach <= usable else usable / reach
+    return {
+        key: ((x - centre_x) * scale, (y - centre_y) * scale)
+        for key, (x, y) in locations.items()
+    }
+
+
 def navigate_to(
     location_id: str,
     checkpoint_path: str | Path = CHECKPOINT_DIR / "nav_ppo.pt",
     locations: Dict[str, Tuple[float, float]] = DEFAULT_LOCATIONS,
     gui: bool = False,
     max_steps: int = 300,
+    room_size: float = 4.0,
 ) -> dict:
     """OpenClaw/agentic tool: drive the trained nav policy to `location_id`."""
     if location_id not in locations:
         raise KeyError(f"navigate_to: unknown location_id '{location_id}'. Known: {list(locations)}")
     register()
     infer_fn = _load_inference_fn(checkpoint_path)
-    env = NavEnv(goal_override=locations[location_id], gui=gui, max_steps=max_steps)
+    goal = fit_locations_to_arena(locations, room_size=room_size)[location_id]
+    env = NavEnv(
+        goal_override=goal, gui=gui, max_steps=max_steps, room_size=room_size
+    )
     info = _rollout(env, infer_fn, max_steps)
-    return {"skill": "navigate_to", "location_id": location_id, **info}
+    return {
+        "skill": "navigate_to",
+        "location_id": location_id,
+        "goal_xy": [round(float(goal[0]), 3), round(float(goal[1]), 3)],
+        **info,
+    }
 
 
 def pick_up(

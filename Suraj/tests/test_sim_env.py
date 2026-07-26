@@ -37,8 +37,14 @@ class TestPybulletScene:
             scene.load_ground_plane(client)
             robot_id = scene.load_robot(STAND_IN_CONFIG, client)
             handles = scene.RobotHandles.build(STAND_IN_CONFIG, client, robot_id)
-            assert len(handles.arm_joint_indices) == 3
-            assert len(handles.gripper_joint_indices) == 2
+            # Driven by the config rather than a literal: the stand-in arm grew
+            # a shoulder_yaw_joint (3 -> 4 DOF) so it can reach off the x-z
+            # plane, and the point of this check is that every configured joint
+            # resolves, not what the count happens to be.
+            assert len(handles.arm_joint_indices) == len(STAND_IN_CONFIG.arm_joint_names)
+            assert len(handles.gripper_joint_indices) == len(
+                STAND_IN_CONFIG.gripper_joint_names
+            )
             assert handles.ee_link_index >= 0
         finally:
             scene.disconnect(client)
@@ -152,7 +158,7 @@ class TestGraspEnv:
         """A hand-scripted (not learned) approach-grasp-lift sequence should
         succeed -- validates the IK drive + grasp_attach trigger + lift
         reward path end to end, independent of whether PPO has converged."""
-        from simbiote.sim_env.grasp_task import GraspEnv
+        from simbiote.sim_env.grasp_task import GRASP_DIST_THRESHOLD, GraspEnv
 
         # object_position_override is deliberately near the edge of the
         # stand-in arm's reach -- the 3-DOF IK chain can spend a couple dozen
@@ -171,7 +177,7 @@ class TestGraspEnv:
                 delta = np.clip(np.array(obj_pos) - np.array(ee_pos), -0.03, 0.03)
                 action = np.array([delta[0], delta[1], delta[2], -1.0], dtype=np.float32)
                 obs, reward, terminated, truncated, info = env.step(action)
-                if info["ee_object_dist"] < 0.06 or terminated:
+                if info["ee_object_dist"] < GRASP_DIST_THRESHOLD or terminated:
                     break
             # Phase 2: close the gripper to trigger attach().
             for _ in range(15):

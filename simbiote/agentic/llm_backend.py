@@ -113,6 +113,25 @@ PROFILES: dict[str, ModelProfile] = {
         resident="laptop (Ollama)",
         notes="Tonight's laptop model.",
     ),
+    "qwen3-8b-vllm": ModelProfile(
+        name="qwen3-8b-vllm",
+        model="qwen3-8b",
+        base_url="http://localhost:8000/v1",
+        footprint_gb=6.0,
+        timeout_s=180.0,
+        ready_timeout_s=600.0,
+        resident="always",
+        notes=(
+            "The GB10's working NL-parsing model: local Qwen3-8B-NVFP4 served "
+            "by the NGC vLLM container on :8000. Small enough (~6 GB) to stay "
+            "resident alongside Isaac Sim, unlike the Nemotron profiles, and "
+            "ample for turning one instruction into a couple of tool calls. "
+            "Launch it with --enforce-eager: Inductor autotuning inside the "
+            "container dies on 'CUDA driver error: operation not permitted'. "
+            "The 27B Qwen3.6 in /home/dell/Qwen3.6-27B-FP8 also loads but is "
+            "multimodal and stalls for minutes on encoder-cache profiling."
+        ),
+    ),
     "phi4-mini": ModelProfile(
         name="phi4-mini",
         model="phi4-mini",

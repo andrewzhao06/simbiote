@@ -1,22 +1,34 @@
 """Camera acquisition for teleop.
 
-Confirmed hardware path (spec §6.3): Iriun Webcam turns the teleop iPhone
-into a standard OS-level virtual webcam, so acquisition is just
-cv2.VideoCapture against whichever device index Iriun registered as --
-nothing custom to build for the capture itself. USB is preferred over
-Wi-Fi (~1-5 ms latency, no Wi-Fi dependency).
+Two ways to get the teleop iPhone's camera into OpenCV:
 
-OpenCV does not expose camera *names* on most backends, so pick the Iriun
-device by index. list_camera_indices() helps you find it once; after that,
-pass the same index in via --camera-index or SIMBIOTE_CAMERA_INDEX.
+1. **As a V4L2 device** (`/dev/videoN`) -- what Iriun Webcam does. A phone-webcam
+   client running on the host publishes frames into a `v4l2loopback` device, and
+   acquisition is just `cv2.VideoCapture(index)`. Nothing custom to build.
+
+   Caveat on the GB10: Iriun's Linux client ships **x86-64 only** (the .deb is
+   marked `Architecture: all` but `/usr/local/bin/iriunwebcam` is an x86-64 ELF),
+   so it cannot run on this aarch64 box. DroidCam's Linux client has native
+   arm64 builds and an iOS app, and works the same way. Either one needs the
+   `v4l2loopback` kernel module, which needs root to install.
+
+2. **As a network stream** (`http://…/video`, `rtsp://…`) -- most phone-webcam
+   apps, DroidCam included, also serve MJPEG/RTSP straight off the phone.
+   OpenCV opens those URLs directly, so this path needs **no kernel module and
+   no root at all**. On a box where you can't `sudo`, this is the one that works.
+
+`open_camera()` takes either, so the rest of the teleop chain doesn't care
+which you used. See docs/TELEOP_IPHONE_CAMERA.md for the setup walkthrough.
 """
 
 from __future__ import annotations
 
+import glob
 import os
 import platform
+import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 
 import cv2
 import numpy as np
@@ -25,11 +37,28 @@ DEFAULT_WIDTH = 1280
 DEFAULT_HEIGHT = 720
 DEFAULT_FPS = 30
 
+# A camera source is either an OS device index or a stream URL / device path.
+CameraSource = Union[int, str]
+
+_URL_RE = re.compile(r"^[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
+
 
 def _default_backend() -> int:
     # CAP_DSHOW avoids a multi-second open delay for many virtual cameras
     # (including Iriun) on Windows; other platforms use OpenCV's default.
     return cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_ANY
+
+
+def _is_stream(source: CameraSource) -> bool:
+    return isinstance(source, str) and bool(_URL_RE.match(source))
+
+
+def _coerce_source(source: CameraSource) -> CameraSource:
+    """Accept '2' as index 2, but leave URLs and /dev/video paths as strings."""
+
+    if isinstance(source, str) and source.isdigit():
+        return int(source)
+    return source
 
 
 @dataclass
@@ -40,7 +69,13 @@ class FrameSource:
     width: int
     height: int
     fps: int
-    device_index: int
+    source: CameraSource
+
+    @property
+    def device_index(self) -> Optional[int]:
+        """Backwards-compatible accessor; None when the source is a stream."""
+
+        return self.source if isinstance(self.source, int) else None
 
     def read(self) -> Optional[np.ndarray]:
         ok, frame = self.cap.read()
@@ -58,11 +93,19 @@ class FrameSource:
         self.release()
 
 
+def list_video_devices() -> list[str]:
+    """Return the /dev/video* nodes that exist (Linux only, no probing)."""
+
+    return sorted(glob.glob("/dev/video*"))
+
+
 def list_camera_indices(max_index: int = 8) -> list[int]:
     """Probe indices 0..max_index-1 and return the ones that open successfully.
 
-    Run this once at setup time to find which index Iriun Webcam landed on
-    (it varies by machine/driver order), then reuse that index.
+    Run this once at setup time to find which index the phone-webcam client
+    landed on (it varies by machine/driver order), then reuse that index.
+    OpenCV does not expose camera *names* on most backends, so this is how you
+    identify the device.
     """
 
     backend = _default_backend()
@@ -77,33 +120,96 @@ def list_camera_indices(max_index: int = 8) -> list[int]:
     return found
 
 
+def resolve_source(
+    source: Optional[CameraSource] = None,
+    device_index: Optional[int] = None,
+) -> CameraSource:
+    """Work out which camera to open.
+
+    Precedence: explicit `source` > explicit `device_index` >
+    $SIMBIOTE_CAMERA_URL > $SIMBIOTE_CAMERA_INDEX > 0.
+    """
+
+    if source is not None:
+        return _coerce_source(source)
+    if device_index is not None:
+        return device_index
+
+    url = os.environ.get("SIMBIOTE_CAMERA_URL")
+    if url:
+        return url
+    return int(os.environ.get("SIMBIOTE_CAMERA_INDEX", "0"))
+
+
+def _open_failure_message(source: CameraSource) -> str:
+    if _is_stream(source):
+        return (
+            f"could not open camera stream {source!r}.\n"
+            "  - Check the phone and the GB10 are on the same network and the URL is "
+            "reachable (try: curl -I <url>).\n"
+            "  - Confirm the phone-webcam app is running and streaming.\n"
+            "  See docs/TELEOP_IPHONE_CAMERA.md."
+        )
+
+    devices = list_video_devices()
+    if not devices:
+        return (
+            f"could not open camera at index {source}: no /dev/video* devices exist "
+            "on this machine at all.\n"
+            "  - No v4l2loopback module is loaded, so no phone-webcam client has "
+            "published a device.\n"
+            "  - On this aarch64 box the Iriun Linux client will not run (it is an "
+            "x86-64 binary).\n"
+            "  - Easiest fix, no root required: stream from the phone and pass the "
+            "URL instead, e.g. --camera-url http://<phone-ip>:4747/video\n"
+            "  See docs/TELEOP_IPHONE_CAMERA.md."
+        )
+
+    return (
+        f"could not open camera at index {source}. Existing devices: "
+        f"{', '.join(devices)}. Use list_camera_indices() to find the right index, "
+        "then pass it via --camera-index or SIMBIOTE_CAMERA_INDEX."
+    )
+
+
 def open_camera(
     device_index: Optional[int] = None,
     width: int = DEFAULT_WIDTH,
     height: int = DEFAULT_HEIGHT,
     fps: int = DEFAULT_FPS,
+    source: Optional[CameraSource] = None,
 ) -> FrameSource:
     """Open the teleop camera feed.
 
-    device_index: which OS camera index to open. Falls back to the
-        SIMBIOTE_CAMERA_INDEX env var, then 0. Use list_camera_indices()
-        to discover which index is "Iriun Webcam" on your machine.
+    source: an OS camera index (int), a `/dev/videoN` path, or a stream URL
+        such as `http://192.168.1.50:4747/video`. Falls back to
+        $SIMBIOTE_CAMERA_URL, then $SIMBIOTE_CAMERA_INDEX, then index 0.
+    device_index: legacy alias for an integer `source`.
     """
 
-    if device_index is None:
-        device_index = int(os.environ.get("SIMBIOTE_CAMERA_INDEX", "0"))
+    resolved = resolve_source(source=source, device_index=device_index)
 
-    cap = cv2.VideoCapture(device_index, _default_backend())
+    if _is_stream(resolved):
+        cap = cv2.VideoCapture(resolved)
+    else:
+        cap = cv2.VideoCapture(resolved, _default_backend())
+
     if not cap.isOpened():
-        raise RuntimeError(
-            f"could not open camera at index {device_index}. "
-            "Confirm 'Iriun Webcam' is running and connected (USB preferred), "
-            "then use list_camera_indices() to find the right index."
-        )
+        cap.release()
+        raise RuntimeError(_open_failure_message(resolved))
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-    cap.set(cv2.CAP_PROP_FPS, fps)
+    if not _is_stream(resolved):
+        # Stream servers dictate their own resolution; only ask a local device.
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        cap.set(cv2.CAP_PROP_FPS, fps)
+
+    # Keep latency down: without this OpenCV buffers frames and teleop drifts
+    # further behind the operator's hand the longer the session runs.
+    try:
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    except cv2.error:  # pragma: no cover - backend dependent
+        pass
 
     actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or width
     actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or height
@@ -114,5 +220,5 @@ def open_camera(
         width=actual_width,
         height=actual_height,
         fps=actual_fps,
-        device_index=device_index,
+        source=resolved,
     )

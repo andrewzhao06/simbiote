@@ -62,7 +62,16 @@ class MapperConfig:
             sam3_checkpoint=Path(value("sam3_checkpoint", str(models_root / "sam3"))),
             dgrut_root=Path(value("dgrut_root", str(tools_root / "3dgrut"))),
             hospital_usd=Path(
-                value("hospital_usd", str(ssd_root / "assets/hospital/hospital.usd"))
+                value(
+                    "hospital_usd",
+                    # Inside the Isaac asset pack, not a symlinked copy: USD
+                    # resolves the scene's relative ./Props references against
+                    # the link's own directory.
+                    str(
+                        ssd_root
+                        / "assets/isaac-5.1/Isaac/Environments/Hospital/hospital.usd"
+                    ),
+                )
             ),
             mode=mode,
             depth_scale_meters=float(pipeline.get("depth_scale_meters", 0.001)),

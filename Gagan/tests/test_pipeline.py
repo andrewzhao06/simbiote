@@ -87,6 +87,9 @@ def test_preview_pipeline_exports_lidar_geometry(capture_dir: Path, tmp_path: Pa
 
     assert result.validation.valid
     text = output.read_text(encoding="utf-8")
-    assert 'def Xform "ReconstructedGeometry"' in text
+    # Typeless so the referenced Points type composes through -- an authored
+    # Xform type would win and leave the prim unrenderable (empty world bound).
+    assert 'def "ReconstructedGeometry"' in text
+    assert 'def Xform "ReconstructedGeometry"' not in text
     preview = next(result.artifacts_path.glob("03_reconstruction/lidar_preview.usda"))
     assert 'def Points "LiDARPreview"' in preview.read_text(encoding="utf-8")
