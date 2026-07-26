@@ -44,6 +44,10 @@ suite. Entry point: `simbiote-agentic` (see `pyproject.toml`).
   execution-report sidecar (`demo_logger.write_report()`) recording which
   LLM backend actually served the plan. CLI: `simbiote-agentic`.
 
+See `simbiote/agentic/README.md` for the full CLI walkthrough (model
+profiles, the Super/Nano trade-off, fallback behavior, and what's still
+stubbed).
+
 ## Tests
 
 `Andrew/tests/` — scene graph parsing/resolution, tool-call schema

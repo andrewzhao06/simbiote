@@ -39,6 +39,19 @@ def test_robot_action_dict_roundtrip_preserves_none_arm_pose():
     assert restored.arm_target_pose is None
 
 
+def test_robot_action_dict_roundtrip_with_arm_pose():
+    action = RobotAction(
+        base_velocity=(0.4, -0.1, 0.2),
+        arm_target_pose=Pose(position=(1.0, 2.0, 0.9)),
+        gripper_state=GripperState.CLOSED,
+    )
+    assert RobotAction.from_dict(action.to_dict()) == action
+
+
+def test_gripper_state_serializes_as_plain_string():
+    assert RobotAction().to_dict()["gripper_state"] == "open"
+
+
 def test_pose_from_dict_accepts_flat_xyzq_form():
     """Some scene-graph fixtures use flat x/y/z/qx.. keys rather than the
     canonical nested position/orientation lists."""

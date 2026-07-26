@@ -15,6 +15,10 @@ tools/
 checkpoints/
 var/
 
+# Local staging dir -- trajectories, reports, exported policies. On the GB10
+# this is /var/simbiote/stage (see spec Part 3); locally it defaults to ./stage.
+stage/
+
 # Editor/OS cruft
 .DS_Store
 Thumbs.db

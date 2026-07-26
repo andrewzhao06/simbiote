@@ -17,6 +17,10 @@ Owns `simbiote/teleop/` and `simbiote/sim_stub/`. Tests live in
 - `simbiote/sim_stub/` — `toy_robot_env.py` + `toy_robot.urdf`, a minimal
   PyBullet robot used to visualize teleop output without needing the full
   training sim environments.
+- `run_teleop_demo.py` (repo root) — convenience entry point, equivalent to
+  `python -m simbiote.teleop.teleop_session` / the `simbiote-teleop` console
+  script (`pyproject.toml`). See `teleop_session.py`'s argparse setup for
+  options (`--sink console|pybullet`, `--camera-index`, `--preview`, `--save`).
 
 Every action produced by a teleop session is logged via
 `simbiote.demo_logger.log_action(action, "teleop", ...)`, so teleop demos and
