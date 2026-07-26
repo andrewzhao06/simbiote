@@ -16,7 +16,14 @@ from pathlib import Path
 from factoryflow import demo_logger
 from factoryflow.agentic import task_executor
 from factoryflow.agentic.command_parser import ParseError, parse_instruction
-from factoryflow.agentic.llm_backend import LLMBackend, make_backend
+from factoryflow.agentic.llm_backend import (
+    PROFILES,
+    LLMBackend,
+    describe_backend,
+    make_backend,
+    primary_of,
+    resolve_profile,
+)
 from factoryflow.agentic.robot_tools import (
     CheckpointBackend,
     RobotBackend,
@@ -39,10 +46,17 @@ class SessionResult:
     report: ExecutionReport | None = None
     trajectory: demo_logger.Trajectory | None = None
     error: str | None = None
+    #: Which backend was configured and which one actually served the parse.
+    llm: dict[str, object] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
         return self.error is None and self.report is not None and self.report.ok
+
+    @property
+    def degraded(self) -> bool:
+        """True if the plan came from the fallback rather than the real model."""
+        return bool(self.llm.get("degraded"))
 
 
 def run_session(
@@ -64,7 +78,9 @@ def run_session(
         result.calls = parse_instruction(instruction, scene, llm)
     except ParseError as exc:
         result.error = str(exc)
+        result.llm = describe_backend(llm)
         return result
+    result.llm = describe_backend(llm)
 
     tools = RobotTools(scene, robot)
 
@@ -88,6 +104,7 @@ def run_session(
         {
             "session_id": session_id,
             "instruction": instruction,
+            "llm": result.llm,
             "plan": [c.to_dict() for c in result.calls],
             **result.report.to_dict(),
         },
@@ -121,7 +138,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="factoryflow-agentic",
         description="Issue a natural-language instruction to the robot (Step 4).",
     )
-    parser.add_argument("instruction", help='e.g. "pick up the tray in the supply room"')
+    parser.add_argument(
+        "instruction",
+        nargs="?",
+        help='e.g. "pick up the tray in the supply room"; optional with --preflight',
+    )
     parser.add_argument(
         "--scene", default=None, help="scene-graph JSON (default: the hospital fixture)"
     )
@@ -130,6 +151,34 @@ def build_parser() -> argparse.ArgumentParser:
         default="fake",
         choices=["fake", "openai-compat"],
         help="instruction-parsing backend (default: fake, no model needed)",
+    )
+    parser.add_argument(
+        "--llm-profile",
+        default=None,
+        choices=sorted(PROFILES),
+        help="model target for --llm openai-compat (default: $FACTORYFLOW_LLM_PROFILE, else qwen3-8b)",
+    )
+    parser.add_argument(
+        "--no-fallback",
+        action="store_true",
+        help=(
+            "fail instead of degrading to the rule-based backend when the model "
+            "server is unreachable — use this during rehearsals"
+        ),
+    )
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help=(
+            "wait for the model server to answer before parsing. Run this the "
+            "moment training ends, while Nemotron Super is loading back in"
+        ),
+    )
+    parser.add_argument(
+        "--preflight-timeout",
+        type=float,
+        default=None,
+        help="seconds to wait in --preflight (default: the profile's ready_timeout_s)",
     )
     parser.add_argument(
         "--robot",
@@ -160,19 +209,75 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_preflight(llm: LLMBackend, args: argparse.Namespace) -> bool:
+    """Warm the model server and report whether it answered.
+
+    Separated from the instruction path because on the day these happen at
+    different moments: preflight as soon as Isaac Sim releases memory, the
+    instruction once an operator is standing at the machine.
+    """
+    backend = primary_of(llm)
+    wait_ready = getattr(backend, "wait_ready", None)
+    if wait_ready is None:
+        print("preflight: nothing to warm (rule-based backend is always ready)")
+        return True
+
+    profile = resolve_profile(args.llm_profile)
+    timeout = args.preflight_timeout if args.preflight_timeout is not None else profile.ready_timeout_s
+    print(
+        f"preflight: waiting up to {timeout:.0f}s for {profile.model} "
+        f"(~{profile.footprint_gb:.0f} GB, resident={profile.resident}) at {profile.base_url}",
+        flush=True,
+    )
+    if wait_ready(timeout):
+        print("preflight: model server ready")
+        return True
+    print(
+        f"preflight: model server did not answer within {timeout:.0f}s",
+        file=sys.stderr,
+    )
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.instruction is None and not args.preflight:
+        parser.error("an instruction is required unless --preflight is given")
 
     scene = load_scene(Path(args.scene) if args.scene else None)
-    llm = make_backend(args.llm, scene)
+    llm = make_backend(
+        args.llm,
+        scene,
+        profile=args.llm_profile,
+        fallback=not args.no_fallback,
+        on_degrade=lambda exc: print(
+            f"\n!! model server unreachable, falling back to the rule-based backend:\n"
+            f"   {exc}\n"
+            f"   This plan was NOT produced by the model. Re-run with --no-fallback "
+            f"to fail instead.\n",
+            file=sys.stderr,
+            flush=True,
+        ),
+    )
     robot: RobotBackend = (
         StubBackend(fail_skills=tuple(args.fail_skill))
         if args.robot == "stub"
         else CheckpointBackend(args.nav_checkpoint, args.grasp_checkpoint)
     )
 
+    if args.preflight:
+        ready = _run_preflight(llm, args)
+        if args.instruction is None:
+            return 0 if ready else 1
+        if not ready and args.no_fallback:
+            return 1
+
+    llm_label = args.llm
+    if args.llm != "fake":
+        llm_label = f"{args.llm}/{resolve_profile(args.llm_profile).name}"
     print(f'instruction: "{args.instruction}"')
-    print(f"scene: {scene.scene_id}  llm: {args.llm}  robot: {args.robot}")
+    print(f"scene: {scene.scene_id}  llm: {llm_label}  robot: {args.robot}")
 
     result = run_session(
         args.instruction,
@@ -201,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
 
     traj_path = demo_logger.session_path(result.session_id, args.stage)
     print(f"\nsession:    {result.session_id}")
+    print(f"planned by: {result.llm.get('served_by')}" + ("  (DEGRADED)" if result.degraded else ""))
     print(f"trajectory: {traj_path}  ({len(result.trajectory or [])} actions)")
 
     if result.ok:

@@ -98,7 +98,8 @@ One JSON object per line, at `$FACTORYFLOW_STAGE/sessions/<session_id>.jsonl`:
 - **`ok` is per-action, not per-skill.** Whether a *skill* ultimately succeeded
   is not knowable at the moment an action is emitted, so it lives in a sidecar
   `<session_id>.report.json` instead — plan, per-step status, timings, failure
-  reason.
+  reason, and which LLM backend actually produced the plan (Part 3's audit
+  trail). The sidecar is Step 4's own file; nothing in the JSONL changes.
 - **Failed runs still log.** Partial demonstrations are useful training data,
   and an empty file after a failure hides what went wrong.
 
