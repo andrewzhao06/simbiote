@@ -223,10 +223,11 @@ def reconstruct(
             list(output.glob("*.usd"))
             + list(output.glob("*.usda"))
             + list(output.glob("*.usdc"))
+            + list(output.glob("*.usdz"))
         )
         if not candidates:
             raise StageError(
-                "3DGRUT adapter must convert reconstruction to a .usd/.usda/.usdc layer"
+                "3DGRUT adapter must export a .usd/.usda/.usdc/.usdz scene layer"
             )
         geometry = candidates[0]
     elif config.mode == "preview":

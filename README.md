@@ -269,6 +269,17 @@ CUDA-enabled PyTorch in the DA3, SAM 3, and 3DGRUT environments. Run each
 repository's documented install process on the GB10 ARM64 system; copying this
 Windows environment will not work.
 
+Run the strict hardware and asset check before attempting a production map:
+
+```bash
+scripts/gb10/preflight_mapper.sh /mnt/factoryflow-ssd/AI "$PWD"
+```
+
+It blocks on missing ARM64/NVIDIA runtime, checkpoints, repositories, COLMAP,
+3DGRUT's Python environment, or non-executable adapters. The hospital asset is
+reported as a warning so a live scan can still proceed, but it remains required
+for the reliable fallback demo.
+
 ## Production run and handoff
 
 ```bash

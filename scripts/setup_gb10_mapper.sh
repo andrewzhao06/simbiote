@@ -42,7 +42,7 @@ root = sys.argv[2]
 text = config.read_text()
 replacements = {
     "/mnt/factoryflow-ssd": root,
-    f'{root}/tools': f'{root}/repos',
+    f"{root}/tools": f"{root}/repos",
     "/usr/local/bin/colmap": "colmap",
 }
 for source, target in replacements.items():
@@ -80,4 +80,5 @@ echo "Next:"
 echo "  1. Copy the scan into '$AI_ROOT/captures/'."
 echo "  2. Confirm model paths; this setup uses the SSD's existing AI/models and AI/repos layout."
 echo "  3. Source '$ENV_FILE'."
-echo "  4. Run: uv run factoryflow-map --config '$CONFIG' doctor"
+echo "  4. Run: '$REPO_ROOT/scripts/gb10/preflight_mapper.sh' '$AI_ROOT' '$REPO_ROOT'"
+echo "  5. Run: uv run factoryflow-map --config '$CONFIG' doctor"
