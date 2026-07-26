@@ -13,6 +13,7 @@ pairing a file of its own -- this module is that home, wiring
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -26,9 +27,24 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEMO_STORE_DIR = REPO_ROOT / "var" / "simbiote" / "stage" / "demos"  # matches §3's write-scoped stage dir
 CHECKPOINT_DIR = REPO_ROOT / "checkpoints"
 
+# Demo file paths are built directly from `Trajectory.task`/`session_id`
+# (attacker-controllable, since Step 3/4's teleop/agentic producers set
+# them) -- restrict both to a safe charset so a value like `../../etc` can't
+# escape `DEMO_STORE_DIR` (path traversal).
+_SAFE_PATH_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _sanitize_path_component(value: str, label: str) -> str:
+    if not _SAFE_PATH_COMPONENT_RE.match(value):
+        raise ValueError(
+            f"Unsafe {label} '{value}': must match {_SAFE_PATH_COMPONENT_RE.pattern!r} "
+            "(letters, digits, '_', '-' only)"
+        )
+    return value
+
 
 def _task_demo_dir(task: str) -> Path:
-    d = DEMO_STORE_DIR / task
+    d = DEMO_STORE_DIR / _sanitize_path_component(task, "task")
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -37,7 +53,8 @@ def ingest_demo(trajectory: Trajectory) -> Path:
     """OpenClaw tool: `ingest_demo()`. Persists one logged demonstration
     (from Step 3's teleop or Step 4's agentic session) to the on-disk demo
     store, keyed by task and session id."""
-    out_path = _task_demo_dir(trajectory.task) / f"{trajectory.session_id}.json"
+    session_id = _sanitize_path_component(trajectory.session_id, "session_id")
+    out_path = _task_demo_dir(trajectory.task) / f"{session_id}.json"
     trajectory.save(out_path)
     return out_path
 
@@ -98,11 +115,17 @@ def finetune_policy(
     )
     policy = ActorCriticMLP.load(bc_ckpt)
 
-    def env_fn():
-        return make_env(task, seed=seed)
+    def make_env_fn(env_index: int):
+        # Each parallel env needs its own seed -- a shared seed across all
+        # `num_envs` workers would replay identical episodes and just
+        # duplicate transitions instead of adding independent experience.
+        def env_fn():
+            return make_env(task, seed=seed + env_index)
+
+        return env_fn
 
     config = PPOConfig(total_timesteps=ppo_timesteps, seed=seed)
-    trained = train_ppo([env_fn for _ in range(num_envs)], policy, config)
+    trained = train_ppo([make_env_fn(i) for i in range(num_envs)], policy, config)
 
     out_path = Path(out_path) if out_path else CHECKPOINT_DIR / f"{task}_ppo.pt"
     trained.save(out_path)

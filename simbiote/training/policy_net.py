@@ -69,11 +69,15 @@ class ActorCriticMLP(nn.Module):
     def act(self, obs: torch.Tensor, deterministic: bool = False):
         dist, value = self.distribution(obs)
         action = dist.mean if deterministic else dist.sample()
-        log_prob = dist.log_prob(action).sum(-1)
         if self.meta.act_low is not None:
             low = torch.as_tensor(self.meta.act_low, dtype=obs.dtype)
             high = torch.as_tensor(self.meta.act_high, dtype=obs.dtype)
             action = torch.clamp(action, low, high)
+        # log_prob must be computed on the *returned* (i.e. clamped) action --
+        # `evaluate_actions()` later recomputes log_prob on this same stored
+        # action, and PPO's importance-sampling ratio (new/old log_prob)
+        # requires both to be evaluated at the same point.
+        log_prob = dist.log_prob(action).sum(-1)
         return action, log_prob, value
 
     def evaluate_actions(self, obs: torch.Tensor, actions: torch.Tensor):

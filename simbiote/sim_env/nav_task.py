@@ -76,6 +76,7 @@ class NavEnv(gym.Env if gym is not None else object):
         self._client: Optional[int] = None
         self._robot_id: Optional[int] = None
         self._obstacle_ids: List[int] = []
+        self._wall_ids: List[int] = []
         self._goal_xy: Tuple[float, float] = (0.0, 0.0)
         self._prev_action = np.zeros(ACT_DIM, dtype=np.float32)
         self._prev_dist = 0.0
@@ -93,7 +94,7 @@ class NavEnv(gym.Env if gym is not None else object):
             self._teardown_episode_bodies()
 
         wall_half = self.room_size / 2.0 - 0.2
-        scene.build_stand_in_arena(self._client, room_size=self.room_size)
+        self._wall_ids = scene.build_stand_in_arena(self._client, room_size=self.room_size)
         self._robot_id = scene.load_robot(self.robot_config, self._client)
 
         self._obstacle_ids = []
@@ -175,7 +176,7 @@ class NavEnv(gym.Env if gym is not None else object):
     def _check_collision(self) -> bool:
         import pybullet as p
 
-        for obs_id in self._obstacle_ids:
+        for obs_id in self._obstacle_ids + self._wall_ids:
             pts = p.getContactPoints(bodyA=self._robot_id, bodyB=obs_id, physicsClientId=self._client)
             if len(pts) > 0:
                 return True

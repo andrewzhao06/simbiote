@@ -115,6 +115,7 @@ class RobotHandles:
     gripper_joint_indices: List[int]
     ee_link_index: int
     base_link_index: int
+    arm_base_link_index: int
     dof_joint_indices: List[int]  # see movable_joint_indices() -- IK output order
     _ik_position_of: Dict[int, int] = field(default_factory=dict)
 
@@ -138,6 +139,7 @@ class RobotHandles:
             gripper_joint_indices=[joints[n] for n in config.gripper_joint_names],
             ee_link_index=links[config.ee_link_name],
             base_link_index=links.get(config.base_link_name, -1),
+            arm_base_link_index=links.get(config.arm_base_link_name, -1),
             dof_joint_indices=dof_indices,
             _ik_position_of={raw: pos for pos, raw in enumerate(dof_indices)},
         )

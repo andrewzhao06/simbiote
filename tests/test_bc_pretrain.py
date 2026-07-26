@@ -2,6 +2,7 @@ import torch
 
 from simbiote.robot_iface.actions import GripperState, Pose, RobotAction
 from simbiote.robot_iface.trajectory import Trajectory, TrajectoryStep, make_toy_trajectory
+from simbiote.sim_env.grasp_task import MAX_EE_STEP
 from simbiote.training.bc_pretrain import task_action_vector, train_bc, trajectories_to_dataset
 from simbiote.training.policy_net import ActorCriticMLP, PolicyMeta
 
@@ -32,10 +33,14 @@ def test_task_action_vector_grasp_delta():
     assert (vec[:3] == 0).all()  # first step: no previous target, delta is zero
     assert vec[3] == -1.0  # open -> -1
 
+    # Requested jump (0.1) exceeds GraspEnv's per-step limit (`MAX_EE_STEP`)
+    # -- task_action_vector() must clip to it, and track the resulting
+    # (clipped) running target rather than the raw teleop pose.
     action2 = RobotAction(arm_target_pose=Pose(position=(0.2, 0.0, 0.2)), gripper_state=GripperState.CLOSED)
-    vec2, _ = task_action_vector(new_target, action2)
-    assert abs(vec2[0] - 0.1) < 1e-6
+    vec2, new_target2 = task_action_vector(new_target, action2)
+    assert abs(vec2[0] - MAX_EE_STEP) < 1e-6
     assert vec2[3] == 1.0  # closed -> 1
+    assert abs(new_target2[0] - (new_target[0] + MAX_EE_STEP)) < 1e-6  # running target reflects the clipped delta, not the raw pose
 
 
 def test_trajectories_to_dataset_grasp_shapes():

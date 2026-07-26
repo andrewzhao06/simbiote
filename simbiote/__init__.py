@@ -1,7 +1,7 @@
 """Simbiote — Teammate 2 (Step 2): Physics, Simulation & Training.
 
-See simbiote_teammate2_physics_training.md (Part 5) for the full spec this
-package implements. Package layout:
+See simbiote_GIANT_ALL_STEPS.md (Part 5) for the full spec this package
+implements. Package layout:
 
     simbiote/
         robot_iface/   shared cross-team schemas (RobotAction, Trajectory) +

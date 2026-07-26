@@ -33,10 +33,16 @@ def main(argv=None) -> Path:
     args = build_arg_parser().parse_args(argv)
     register()
 
-    def env_fn():
-        return make_env("grasp", gui=args.gui, seed=args.seed)
+    def make_env_fn(env_index: int):
+        # Each parallel env needs its own seed -- otherwise every worker
+        # replays the identical object spawn/pose and `--num_envs > 1`
+        # just duplicates transitions instead of adding independent experience.
+        def env_fn():
+            return make_env("grasp", gui=args.gui, seed=args.seed + env_index)
 
-    probe_env = env_fn()
+        return env_fn
+
+    probe_env = make_env_fn(0)()
     obs_dim = probe_env.observation_space.shape[0]
     act_dim = probe_env.action_space.shape[0]
     act_low = tuple(probe_env.action_space.low.tolist())
@@ -60,7 +66,7 @@ def main(argv=None) -> Path:
             f"episodes={stats['num_episodes']}"
         )
 
-    trained = train_ppo([env_fn for _ in range(args.num_envs)], policy, config, progress_callback=progress)
+    trained = train_ppo([make_env_fn(i) for i in range(args.num_envs)], policy, config, progress_callback=progress)
 
     out_path = Path(args.out)
     trained.save(out_path)

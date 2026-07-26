@@ -80,6 +80,7 @@ class GraspEnv(gym.Env if gym is not None else object):
         self._handles = None
         self._object = None
         self._object_spawn_z = 0.0
+        self._arm_base_xy: Tuple[float, float] = (0.0, 0.0)
         self._ee_target = np.zeros(3, dtype=np.float32)
         self._grasp: Optional[grasp_attach.GraspConstraint] = None
         self._gripper_closed = False
@@ -97,6 +98,7 @@ class GraspEnv(gym.Env if gym is not None else object):
 
         self._robot_id = scene.load_robot(self.robot_config, self._client, fixed_base=True)
         self._handles = scene.RobotHandles.build(self.robot_config, self._client, self._robot_id)
+        self._arm_base_xy = self._get_arm_base_xy()
 
         obj_pos = self.object_position_override or (
             self._rng.uniform(0.35, 0.55),
@@ -125,11 +127,16 @@ class GraspEnv(gym.Env if gym is not None else object):
         limits = self.robot_config.action_limits
         candidate = self._ee_target + delta
         candidate[2] = float(np.clip(candidate[2], limits.arm_workspace_min_z, limits.arm_workspace_max_z))
-        radius = math.hypot(candidate[0], candidate[1])
+        # `arm_workspace_radius` is documented (robot_config.py) as reach
+        # from `arm_base_link`, not from the world origin -- clip relative
+        # to the arm's actual base position so valid targets near the arm
+        # (which may not be spawned at world (0, 0)) aren't wrongly rejected.
+        base_x, base_y = self._arm_base_xy
+        radius = math.hypot(candidate[0] - base_x, candidate[1] - base_y)
         if radius > limits.arm_workspace_radius:
             scale = limits.arm_workspace_radius / max(radius, 1e-6)
-            candidate[0] *= scale
-            candidate[1] *= scale
+            candidate[0] = base_x + (candidate[0] - base_x) * scale
+            candidate[1] = base_y + (candidate[1] - base_y) * scale
         self._ee_target = candidate
 
         self._gripper_closed = gripper_cmd > 0.0
@@ -198,6 +205,17 @@ class GraspEnv(gym.Env if gym is not None else object):
                 force=20.0,
                 physicsClientId=self._client,
             )
+
+    def _get_arm_base_xy(self) -> Tuple[float, float]:
+        import pybullet as p
+
+        if self._handles.arm_base_link_index < 0:
+            # Fallback for robot configs that don't resolve an
+            # `arm_base_link` -- treat the workspace as origin-centered
+            # (previous behavior) rather than erroring.
+            return (0.0, 0.0)
+        state = p.getLinkState(self._robot_id, self._handles.arm_base_link_index, physicsClientId=self._client)
+        return state[0][0], state[0][1]
 
     def _get_ee_pos(self) -> Tuple[float, float, float]:
         import pybullet as p
