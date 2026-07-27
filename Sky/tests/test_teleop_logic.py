@@ -19,7 +19,7 @@ from simbiote.teleop.hand_tracking import (
     THUMB_TIP,
     WRIST,
 )
-from simbiote.teleop.ik_bridge import IKBridge
+from simbiote.teleop.ik_bridge import ControlMode, IKBridge
 
 
 def make_landmarks(wrist_xy=(0.5, 0.5), palm_scale=0.15, pinch_ratio=1.0) -> HandLandmarks:
@@ -110,6 +110,68 @@ def test_pinch_closes_gripper_and_open_hand_opens_it():
     bridge2 = IKBridge()
     opened = bridge2.landmarks_to_action(make_landmarks(pinch_ratio=1.0))
     assert opened.gripper_state == GripperState.OPEN
+
+
+# --- pinch as a mode switch --------------------------------------------------
+
+
+def test_pinch_switches_to_manipulate_and_parks_the_base():
+    """Pinching stops the base: you're posing the arm, not driving."""
+
+    bridge = IKBridge(ema_alpha=1.0)
+    driving = bridge.landmarks_to_action(make_landmarks(wrist_xy=(0.9, 0.1)))
+    assert bridge.mode == ControlMode.DRIVE
+    assert driving.base_velocity != (0.0, 0.0, 0.0)
+
+    # Same off-centre hand, now pinched -> base must stop regardless.
+    pinched = bridge.landmarks_to_action(make_landmarks(wrist_xy=(0.9, 0.1), pinch_ratio=0.05))
+    assert bridge.mode == ControlMode.MANIPULATE
+    assert pinched.base_velocity == (0.0, 0.0, 0.0)
+    assert pinched.gripper_state == GripperState.CLOSED
+
+
+def test_hand_height_moves_the_claw_only_while_pinched():
+    bridge = IKBridge(ema_alpha=1.0)
+
+    # Driving: the arm target is held, so height changes must not move it.
+    low_drive = bridge.landmarks_to_action(make_landmarks(wrist_xy=(0.5, 0.8)))
+    high_drive = bridge.landmarks_to_action(make_landmarks(wrist_xy=(0.5, 0.2)))
+    assert low_drive.arm_target_pose.position == high_drive.arm_target_pose.position
+
+    # Pinched: hand up must raise the claw relative to hand down.
+    low = bridge.landmarks_to_action(make_landmarks(wrist_xy=(0.5, 0.8), pinch_ratio=0.05))
+    high = bridge.landmarks_to_action(make_landmarks(wrist_xy=(0.5, 0.2), pinch_ratio=0.05))
+    assert high.arm_target_pose.position[2] > low.arm_target_pose.position[2]
+    # ...and only the height changed.
+    assert high.arm_target_pose.position[:2] == low.arm_target_pose.position[:2]
+
+
+def test_mode_does_not_flicker_at_the_pinch_threshold():
+    """Hysteresis: releasing needs a wider gap than grabbing did."""
+
+    bridge = IKBridge(ema_alpha=1.0)
+    bridge.landmarks_to_action(make_landmarks(pinch_ratio=0.05))
+    assert bridge.mode == ControlMode.MANIPULATE
+
+    # Just above the *enter* threshold is not enough to release.
+    bridge.landmarks_to_action(make_landmarks(pinch_ratio=0.40))
+    assert bridge.mode == ControlMode.MANIPULATE
+
+    # Opening properly releases.
+    bridge.landmarks_to_action(make_landmarks(pinch_ratio=0.9))
+    assert bridge.mode == ControlMode.DRIVE
+
+
+def test_tracking_dropout_mid_grasp_keeps_holding():
+    """A glitch shouldn't open the gripper and drop what the robot is carrying."""
+
+    bridge = IKBridge(ema_alpha=1.0)
+    bridge.landmarks_to_action(make_landmarks(pinch_ratio=0.05))
+    dropped = bridge.landmarks_to_action(None)
+
+    assert bridge.mode == ControlMode.MANIPULATE
+    assert dropped.gripper_state == GripperState.CLOSED
+    assert dropped.base_velocity == (0.0, 0.0, 0.0)
 
 
 def test_missing_hand_freezes_arm_but_stops_base():
