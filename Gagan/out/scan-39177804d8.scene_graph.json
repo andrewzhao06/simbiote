@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0",
+  "coordinate_system": "Y_UP_RIGHT_HANDED_METERS",
+  "nodes": [
+    {
+      "node_id": "navigable_floor",
+      "label": "navigable floor",
+      "kind": "floor",
+      "bounds": {
+        "center": [
+          17.226499557495117,
+          -3.220097867126216,
+          19.05150032043457
+        ],
+        "size": [
+          2.875,
+          0.05,
+          8.005001068115234
+        ]
+      },
+      "confidence": 0.95703125,
+      "source_frame_ids": [
+        0,
+        160,
+        480,
+        640,
+        800,
+        960,
+        1120,
+        1280,
+        1440,
+        1600,
+        1760
+      ],
+      "attributes": {
+        "is_navigable": true,
+        "collision_enabled": true,
+        "friction_static": 0.9,
+        "friction_dynamic": 0.8
+      }
+    },
+    {
+      "node_id": "chair",
+      "label": "chair",
+      "kind": "object",
+      "bounds": {
+        "center": [
+          17.826116035959224,
+          -2.9105142116634033,
+          14.44326305129059
+        ],
+        "size": [
+          0.566336953187097,
+          0.6829375282453483,
+          0.4061193441266955
+        ]
+      },
+      "confidence": 0.8828125,
+      "source_frame_ids": [
+        0
+      ],
+      "attributes": {
+        "is_graspable": true,
+        "grasp_type": "parallel_jaw",
+        "mass_kg": 0.25,
+        "collision_enabled": true,
+        "friction_static": 0.6,
+        "friction_dynamic": 0.5
+      }
+    },
+    {
+      "node_id": "book",
+      "label": "book",
+      "kind": "object",
+      "bounds": {
+        "center": [
+          18.343960542833962,
+          -2.8215360747327365,
+          14.815189308730403
+        ],
+        "size": [
+          0.2251003150542381,
+          0.3542338259722828,
+          0.4067886815685373
+        ]
+      },
+      "confidence": 0.640625,
+      "source_frame_ids": [
+        160
+      ],
+      "attributes": {
+        "is_graspable": true,
+        "grasp_type": "parallel_jaw",
+        "mass_kg": 0.25,
+        "collision_enabled": true,
+        "friction_static": 0.6,
+        "friction_dynamic": 0.5
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {
+    "source_capture": "/home/dell/simbiote-Gagan1_Suraj2_Sky3_Andrew4/UPLOAD_PHONE_SCANS_HERE/scan-39177804d8",
+    "geometry_path": "/home/dell/factoryflow/stage/mapper/20260726T231315.183822Z/03_reconstruction/lidar_preview.usda",
+    "proxy": false
+  }
+}

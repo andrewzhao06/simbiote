@@ -1,0 +1,20 @@
+[paths]
+# Change this to the AI directory on the SSD mounted on the GB10.
+ssd_root = "/mnt/factoryflow-ssd/AI"
+work_root = "/var/factoryflow/stage/mapper"
+models_root = "/mnt/factoryflow-ssd/AI/models"
+tools_root = "/mnt/factoryflow-ssd/AI/repos"
+colmap_binary = "/usr/local/bin/colmap"
+ffprobe_binary = "/usr/bin/ffprobe"
+depth_checkpoint = "/mnt/factoryflow-ssd/AI/models/depth-anything"
+sam3_checkpoint = "/mnt/factoryflow-ssd/AI/models/sam3"
+dgrut_root = "/mnt/factoryflow-ssd/AI/repos/3dgrut"
+hospital_usd = "/mnt/factoryflow-ssd/AI/assets/isaac-5.1/Isaac/Environments/Hospital/hospital.usd"
+
+[pipeline]
+# Use "proxy" to test capture parsing and the Step 2 USD contract without geometry.
+# Use "preview" for CPU-only LiDAR point-cloud geometry from a Stray Scanner capture.
+# Use "production" only after all four adapter commands described in README.md are set.
+mode = "proxy"
+depth_scale_meters = 0.001
+confidence_threshold = 1

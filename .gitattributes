@@ -1,0 +1,5 @@
+# Preserve the scanner's raw CSV export byte layout.
+ab567bedef/odometry.csv -whitespace
+
+# GB10 adapter scripts must use Unix line endings.
+scripts/**/*.sh text eol=lf

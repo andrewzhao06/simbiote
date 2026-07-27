@@ -1,0 +1,175 @@
+<?xml version="1.0"?>
+<!--
+  Stand-in robot for tonight's PyBullet logic testing (spec §5.4).
+
+  NOT a dimensionally-accurate stand-in for the Clearpath Ridgeback + Franka
+  Panda used tomorrow on Isaac Sim (`ridgeback_franka.usd`) — this exists
+  purely to validate reward shaping, task logic, and grasp-attach/release
+  behavior on a laptop with no GPU. Visual/dimensional fidelity intentionally
+  not a goal here.
+
+  Structure:
+    base_link          -- free-floating box "mobile base" (driven via
+                           p.resetBaseVelocity in nav_task.py, matching the
+                           real Ridgeback's mecanum-drive omnidirectional
+                           motion model closely enough for logic testing)
+    arm_base_link       -- fixed offset on top of the base
+    shoulder_link        -- revolute (pitch) -- shoulder_joint
+    forearm_link          -- revolute (pitch) -- elbow_joint
+    wrist_link             -- revolute (roll)  -- wrist_joint
+    ee_link                 -- fixed to wrist_link, the grasp reference frame
+    left_finger_link/
+    right_finger_link        -- prismatic gripper fingers
+-->
+<robot name="stand_in_robot">
+
+  <material name="base_gray"><color rgba="0.35 0.35 0.4 1.0"/></material>
+  <material name="arm_orange"><color rgba="0.9 0.45 0.1 1.0"/></material>
+  <material name="gripper_dark"><color rgba="0.15 0.15 0.15 1.0"/></material>
+
+  <link name="base_link">
+    <inertial>
+      <mass value="25.0"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="0.8" ixy="0" ixz="0" iyy="1.0" iyz="0" izz="1.2"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0"/>
+      <geometry><box size="0.55 0.4 0.15"/></geometry>
+      <material name="base_gray"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0"/>
+      <geometry><box size="0.55 0.4 0.15"/></geometry>
+    </collision>
+  </link>
+
+  <!-- Four decorative wheel cylinders (fixed -- base motion is applied
+       directly via resetBaseVelocity, not wheel torque; see nav_task.py). -->
+  <link name="wheel_fl"><visual><geometry><cylinder radius="0.08" length="0.05"/></geometry><material name="gripper_dark"/></visual></link>
+  <link name="wheel_fr"><visual><geometry><cylinder radius="0.08" length="0.05"/></geometry><material name="gripper_dark"/></visual></link>
+  <link name="wheel_rl"><visual><geometry><cylinder radius="0.08" length="0.05"/></geometry><material name="gripper_dark"/></visual></link>
+  <link name="wheel_rr"><visual><geometry><cylinder radius="0.08" length="0.05"/></geometry><material name="gripper_dark"/></visual></link>
+
+  <joint name="wheel_fl_fixed" type="fixed">
+    <parent link="base_link"/><child link="wheel_fl"/>
+    <origin xyz="0.2 0.22 -0.05" rpy="1.5708 0 0"/>
+  </joint>
+  <joint name="wheel_fr_fixed" type="fixed">
+    <parent link="base_link"/><child link="wheel_fr"/>
+    <origin xyz="0.2 -0.22 -0.05" rpy="1.5708 0 0"/>
+  </joint>
+  <joint name="wheel_rl_fixed" type="fixed">
+    <parent link="base_link"/><child link="wheel_rl"/>
+    <origin xyz="-0.2 0.22 -0.05" rpy="1.5708 0 0"/>
+  </joint>
+  <joint name="wheel_rr_fixed" type="fixed">
+    <parent link="base_link"/><child link="wheel_rr"/>
+    <origin xyz="-0.2 -0.22 -0.05" rpy="1.5708 0 0"/>
+  </joint>
+
+  <!-- Arm: 4-DOF (shoulder YAW, shoulder pitch, elbow pitch, wrist roll).
+       The yaw joint is load-bearing, not decoration. Without it the only two
+       positioning joints (shoulder + elbow) both rotate about Y, so the whole
+       arm is planar: the end-effector's world y is pinned at exactly 0.000 and
+       cannot track a target off the x-z plane. GraspEnv spawns objects at
+       y in [-0.2, 0.2], well outside the 0.06 m attach threshold, so grasping
+       was geometrically impossible -- a scripted oracle driving the EE straight
+       at the object never got closer than 0.105 m, and PPO sat at 0.00 success
+       for 60k timesteps because there was no success to find.
+       (wrist_joint's Z axis is at the end of the chain: it spins the gripper,
+       it does not translate the EE.) -->
+  <link name="arm_base_link">
+    <inertial><mass value="1.0"/><inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/></inertial>
+    <visual><geometry><cylinder radius="0.05" length="0.08"/></geometry><material name="arm_orange"/></visual>
+    <collision><geometry><cylinder radius="0.05" length="0.08"/></geometry></collision>
+  </link>
+  <joint name="arm_base_fixed" type="fixed">
+    <parent link="base_link"/><child link="arm_base_link"/>
+    <origin xyz="0.15 0 0.11" rpy="0 0 0"/>
+  </joint>
+
+  <link name="shoulder_yaw_link">
+    <inertial><mass value="0.3"/><inertia ixx="0.002" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.002"/></inertial>
+    <visual><geometry><cylinder radius="0.04" length="0.04"/></geometry><material name="arm_orange"/></visual>
+    <collision><geometry><cylinder radius="0.04" length="0.04"/></geometry></collision>
+  </link>
+  <joint name="shoulder_yaw_joint" type="revolute">
+    <parent link="arm_base_link"/><child link="shoulder_yaw_link"/>
+    <origin xyz="0 0 0.06" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="50" velocity="2.0"/>
+  </joint>
+
+  <link name="shoulder_link">
+    <inertial><mass value="0.8"/><inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.005"/></inertial>
+    <visual><origin xyz="0.15 0 0"/><geometry><cylinder radius="0.03" length="0.3"/></geometry><material name="arm_orange"/></visual>
+    <collision><origin xyz="0.15 0 0"/><geometry><cylinder radius="0.03" length="0.3"/></geometry></collision>
+  </link>
+  <joint name="shoulder_joint" type="revolute">
+    <parent link="shoulder_yaw_link"/><child link="shoulder_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="50" velocity="2.0"/>
+  </joint>
+
+  <link name="forearm_link">
+    <inertial><mass value="0.6"/><inertia ixx="0.004" ixy="0" ixz="0" iyy="0.004" iyz="0" izz="0.004"/></inertial>
+    <visual><origin xyz="0.13 0 0"/><geometry><cylinder radius="0.025" length="0.26"/></geometry><material name="arm_orange"/></visual>
+    <collision><origin xyz="0.13 0 0"/><geometry><cylinder radius="0.025" length="0.26"/></geometry></collision>
+  </link>
+  <joint name="elbow_joint" type="revolute">
+    <parent link="shoulder_link"/><child link="forearm_link"/>
+    <origin xyz="0.3 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.35" upper="2.35" effort="40" velocity="2.0"/>
+  </joint>
+
+  <link name="wrist_link">
+    <inertial><mass value="0.3"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>
+    <visual><geometry><cylinder radius="0.02" length="0.06"/></geometry><material name="arm_orange"/></visual>
+    <collision><geometry><cylinder radius="0.02" length="0.06"/></geometry></collision>
+  </link>
+  <joint name="wrist_joint" type="revolute">
+    <parent link="forearm_link"/><child link="wrist_link"/>
+    <origin xyz="0.26 0 0" rpy="0 1.5708 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="20" velocity="3.0"/>
+  </joint>
+
+  <!-- ee_link: the grasp reference frame read by grasp_attach.py / grasp_task.py -->
+  <link name="ee_link">
+    <inertial><mass value="0.1"/><inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/></inertial>
+    <visual><geometry><box size="0.04 0.08 0.04"/></geometry><material name="gripper_dark"/></visual>
+    <collision><geometry><box size="0.04 0.08 0.04"/></geometry></collision>
+  </link>
+  <joint name="ee_fixed" type="fixed">
+    <parent link="wrist_link"/><child link="ee_link"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+  <link name="left_finger_link">
+    <inertial><mass value="0.05"/><inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/></inertial>
+    <visual><geometry><box size="0.015 0.015 0.05"/></geometry><material name="gripper_dark"/></visual>
+    <collision><geometry><box size="0.015 0.015 0.05"/></geometry></collision>
+  </link>
+  <joint name="left_finger_joint" type="prismatic">
+    <parent link="ee_link"/><child link="left_finger_link"/>
+    <origin xyz="0 0.025 0.03" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0.0" upper="0.04" effort="20" velocity="0.5"/>
+  </joint>
+
+  <link name="right_finger_link">
+    <inertial><mass value="0.05"/><inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/></inertial>
+    <visual><geometry><box size="0.015 0.015 0.05"/></geometry><material name="gripper_dark"/></visual>
+    <collision><geometry><box size="0.015 0.015 0.05"/></geometry></collision>
+  </link>
+  <joint name="right_finger_joint" type="prismatic">
+    <parent link="ee_link"/><child link="right_finger_link"/>
+    <origin xyz="0 -0.025 0.03" rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0.0" upper="0.04" effort="20" velocity="0.5"/>
+  </joint>
+
+</robot>

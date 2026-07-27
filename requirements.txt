@@ -1,0 +1,35 @@
+# Simbiote — Teammate 2 (Step 2: Physics, Simulation & Training)
+# Laptop tier (today). See requirements-gb10.md / spec §5.3 for the GB10 swap.
+#
+# NOTE (Windows devs, see README "Known issues"): pybullet ships no Windows
+# wheels on PyPI (only manylinux + a source sdist) -- installing it on native
+# Windows requires MSVC Build Tools. Everything in this file EXCEPT pybullet
+# installs fine on Windows/macOS/Linux as-is; pybullet-dependent code paths
+# degrade gracefully (skipped, not crashed) when it isn't importable.
+
+numpy>=1.26
+torch>=2.5
+gymnasium>=0.29
+
+# Physics engine (today). Linux/macOS: `pip install pybullet` just works.
+# Windows: install MSVC Build Tools first, or do this slice of the work in
+# WSL2/a Linux VM/a teammate's Mac. See README.
+pybullet>=3.2.6; sys_platform != "win32"
+
+# Policy export for Steps 3 & 4. onnxscript is required by torch>=2.7's
+# dynamo-based ONNX exporter (torch.onnx.export uses it by default now).
+onnx>=1.16
+onnxruntime>=1.18
+onnxscript>=0.1
+
+# Step 3 -- hand-tracking teleop (Sky). opencv/mediapipe are only imported
+# lazily inside simbiote/teleop/*.py, so the rest of the package (sim_env,
+# training, agentic) works fine without them installed.
+opencv-python>=4.9
+mediapipe>=0.10
+
+# Step 4 -- agentic/LLM control (Andrew). Deliberately has no extra runtime
+# dependency beyond stdlib (urllib) -- see simbiote/agentic/llm_backend.py.
+
+# Tests.
+pytest>=8.0

@@ -1,0 +1,49 @@
+{
+  "_comment": "Part -> check-prefix map used by render_status.py to regenerate the Parts table in STATUS.md. Edit this file (not the table) when you add a part or a check. 'prefixes' are matched against check filenames; 'state' pins a part that has no check of its own.",
+  "parts": [
+    {
+      "id": 1,
+      "name": "3DGRUT core env — venv, PyTorch cu130/aarch64, editable install",
+      "prefixes": ["10_", "20_"],
+      "owner": "agent A"
+    },
+    {
+      "id": 2,
+      "name": "Native builds — tiny-cuda-nn, Kaolin from source on CUDA 13",
+      "prefixes": ["30_"],
+      "owner": "agent B"
+    },
+    {
+      "id": 3,
+      "name": "3DGUT tracer + slangc + extra requirements",
+      "prefixes": ["40_"],
+      "owner": "agent C"
+    },
+    {
+      "id": 4,
+      "name": "Mapper integration — preflight green, production mode reachable",
+      "prefixes": ["50_"],
+      "owner": "agent C"
+    },
+    {
+      "id": 5,
+      "name": "Isaac Sim handoff — stage meets the Step 2 contract",
+      "prefixes": ["60_"],
+      "owner": "done"
+    },
+    {
+      "id": 6,
+      "name": "Event stack — OpenClaw / NemoClaw / OpenShell",
+      "prefixes": ["70_", "71_", "72_"],
+      "owner": "agent D"
+    },
+    {
+      "id": 7,
+      "name": "Autonomous test harness — regression detection, watch mode",
+      "prefixes": [],
+      "owner": "agent E",
+      "state": "PASS",
+      "note": "harness itself: trend.py / watch.sh / render_status.py"
+    }
+  ]
+}

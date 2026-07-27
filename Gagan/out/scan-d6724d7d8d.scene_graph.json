@@ -1,0 +1,235 @@
+{
+  "schema_version": "1.0",
+  "coordinate_system": "Y_UP_RIGHT_HANDED_METERS",
+  "nodes": [
+    {
+      "node_id": "navigable_floor",
+      "label": "navigable floor",
+      "kind": "floor",
+      "bounds": {
+        "center": [
+          6.089435100555419,
+          -1.2489646245359793,
+          -0.828341555595398
+        ],
+        "size": [
+          6.1864700317382795,
+          0.05,
+          2.692117071151733
+        ]
+      },
+      "confidence": 0.984375,
+      "source_frame_ids": [
+        0,
+        324,
+        649,
+        974,
+        1298,
+        1623,
+        1948,
+        2597,
+        2922,
+        3247,
+        3572
+      ],
+      "attributes": {
+        "is_navigable": true,
+        "collision_enabled": true,
+        "friction_static": 0.9,
+        "friction_dynamic": 0.8
+      }
+    },
+    {
+      "node_id": "chair",
+      "label": "chair",
+      "kind": "object",
+      "bounds": {
+        "center": [
+          4.82078517536355,
+          -0.6331220774097177,
+          0.3940769661995271
+        ],
+        "size": [
+          0.6568309100315437,
+          0.40721492189304825,
+          0.559660384005365
+        ]
+      },
+      "confidence": 0.984375,
+      "source_frame_ids": [
+        0,
+        324,
+        974,
+        1623,
+        3247,
+        3572
+      ],
+      "attributes": {
+        "is_graspable": true,
+        "grasp_type": "parallel_jaw",
+        "mass_kg": 0.25,
+        "collision_enabled": true,
+        "friction_static": 0.6,
+        "friction_dynamic": 0.5
+      }
+    },
+    {
+      "node_id": "chair_2",
+      "label": "chair",
+      "kind": "object",
+      "bounds": {
+        "center": [
+          3.8920815105007693,
+          -0.5646941095800355,
+          -2.3502047965972253
+        ],
+        "size": [
+          0.5304334294540949,
+          0.3684787049099806,
+          0.5112793297296512
+        ]
+      },
+      "confidence": 0.98046875,
+      "source_frame_ids": [
+        0,
+        974,
+        2597
+      ],
+      "attributes": {
+        "is_graspable": true,
+        "grasp_type": "parallel_jaw",
+        "mass_kg": 0.25,
+        "collision_enabled": true,
+        "friction_static": 0.6,
+        "friction_dynamic": 0.5
+      }
+    },
+    {
+      "node_id": "chair_3",
+      "label": "chair",
+      "kind": "object",
+      "bounds": {
+        "center": [
+          6.394990802178955,
+          -0.7528504909479481,
+          -2.06900649221189
+        ],
+        "size": [
+          0.5864944489671995,
+          0.587337041079102,
+          0.5350882444100442
+        ]
+      },
+      "confidence": 0.96484375,
+      "source_frame_ids": [
+        324,
+        974,
+        1623,
+        3572
+      ],
+      "attributes": {
+        "is_graspable": true,
+        "grasp_type": "parallel_jaw",
+        "mass_kg": 0.25,
+        "collision_enabled": true,
+        "friction_static": 0.6,
+        "friction_dynamic": 0.5
+      }
+    },
+    {
+      "node_id": "chair_4",
+      "label": "chair",
+      "kind": "object",
+      "bounds": {
+        "center": [
+          3.8983804200371437,
+          -0.9369153804929469,
+          -2.183673503375303
+        ],
+        "size": [
+          0.47465090985795033,
+          0.4959740954267211,
+          0.21605309152662855
+        ]
+      },
+      "confidence": 0.96484375,
+      "source_frame_ids": [
+        1623
+      ],
+      "attributes": {
+        "is_graspable": true,
+        "grasp_type": "parallel_jaw",
+        "mass_kg": 0.25,
+        "collision_enabled": true,
+        "friction_static": 0.6,
+        "friction_dynamic": 0.5
+      }
+    },
+    {
+      "node_id": "chair_5",
+      "label": "chair",
+      "kind": "object",
+      "bounds": {
+        "center": [
+          6.164660394090152,
+          -0.9591928539067522,
+          0.3050123535019664
+        ],
+        "size": [
+          0.6037319035316902,
+          0.5167377006917557,
+          0.10426812251210832
+        ]
+      },
+      "confidence": 0.94921875,
+      "source_frame_ids": [
+        974
+      ],
+      "attributes": {
+        "is_graspable": true,
+        "grasp_type": "parallel_jaw",
+        "mass_kg": 0.25,
+        "collision_enabled": true,
+        "friction_static": 0.6,
+        "friction_dynamic": 0.5
+      }
+    },
+    {
+      "node_id": "chair_6",
+      "label": "chair",
+      "kind": "object",
+      "bounds": {
+        "center": [
+          5.819622615470456,
+          -0.6590159882483118,
+          0.5593258118972948
+        ],
+        "size": [
+          0.16877012321785134,
+          0.2340887169811472,
+          0.3092564078359127
+        ]
+      },
+      "confidence": 0.79296875,
+      "source_frame_ids": [
+        324,
+        1623,
+        3572
+      ],
+      "attributes": {
+        "is_graspable": true,
+        "grasp_type": "parallel_jaw",
+        "mass_kg": 0.25,
+        "collision_enabled": true,
+        "friction_static": 0.6,
+        "friction_dynamic": 0.5
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {
+    "source_capture": "/home/dell/simbiote-Gagan1_Suraj2_Sky3_Andrew4/UPLOAD_PHONE_SCANS_HERE/scan-d6724d7d8d",
+    "geometry_path": "/home/dell/factoryflow/stage/mapper/20260726T231448.305921Z/03_reconstruction/lidar_preview.usda",
+    "proxy": false
+  }
+}
