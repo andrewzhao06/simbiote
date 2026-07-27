@@ -64,6 +64,35 @@ parser.add_argument(
     default=None,
     help="LLM profile name (default: SIMBIOTE_LLM_PROFILE, else qwen3-8b)",
 )
+parser.add_argument(
+    "--light",
+    action="store_true",
+    help="low-graphics mode: cheap RTX, roof and ceiling lights hidden. "
+         "Colliders are untouched, so the robot drives identically.",
+)
+parser.add_argument(
+    "--minimal",
+    action="store_true",
+    help="draw only the building shell -- every prop is hidden. Colliders "
+         "stay, so navigation is identical.",
+)
+parser.add_argument(
+    "--pace",
+    type=float,
+    default=0.02,
+    help="seconds to yield after each drawn frame. This is what keeps the "
+         "window answering the desktop; at 0 it renders flat out and the WM "
+         "reports it as not responding (default 0.02)",
+)
+parser.add_argument(
+    "--render-interval",
+    type=float,
+    default=0.25,
+    help="min seconds between drawn frames. Raise it (0.5, 1.0) to trade a "
+         "jerkier picture for a robot that keeps moving (default 0.25 = 4 fps)",
+)
+parser.add_argument("--width", type=int, default=1280)
+parser.add_argument("--height", type=int, default=720)
 parser.add_argument("--nav-checkpoint", default=str(REPO / "checkpoints" / "nav_bc.pt"))
 parser.add_argument("--scene", default=str(REPO / "simbiote" / "fixtures" / "hospital_scene_graph.json"))
 parser.add_argument("--stage", default=str(REPO / "stage"))
@@ -90,8 +119,21 @@ os.environ.setdefault("SIMBIOTE_LLM_TIMEOUT", "300")
 # Boot the simulator before anything else touches Isaac's modules.
 from simbiote.sim_env.isaac_nav import IsaacHospital  # noqa: E402
 
-print("booting Isaac Sim and loading hospital.usd ...")
-hospital = IsaacHospital(headless=not args.gui, checkpoint=args.nav_checkpoint)
+print("booting Isaac Sim and loading hospital.usd (first run cooks colliders) ...")
+hospital = IsaacHospital(
+    headless=not args.gui,
+    checkpoint=args.nav_checkpoint,
+    width=args.width,
+    height=args.height,
+    low_graphics=args.light or args.minimal,
+    hide_roof=args.light or args.minimal,
+    minimal_scene=args.minimal,
+    pace=args.pace,
+    render_interval=args.render_interval,
+    # Print progress while a traversal runs, so a long drive is visibly
+    # working rather than indistinguishable from a hang.
+    progress_every=30,
+)
 print(f"  robot at {tuple(round(v, 2) for v in hospital.base_xy())}")
 print(f"  destinations: {', '.join(sorted(hospital.locations))}\n")
 

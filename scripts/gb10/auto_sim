@@ -10,7 +10,16 @@
 #
 # Pick a number and the robot drives there. The menu comes back afterwards.
 #
-# Anything passed to auto_sim is forwarded to Andrew/hospital_demo.py, so:
+# Defaults to --light: cheap RTX, roof and ceiling lights hidden, 1280x720.
+# Colliders are untouched, so the robot drives exactly as it would at full
+# quality -- only the picture is cheaper. Full RTX on this box makes the
+# window stop answering the desktop, which looks indistinguishable from a
+# crash.
+#
+#     auto_sim --minimal         # building shell only, every prop hidden
+#     auto_sim --full            # full quality, if you want the pretty one
+#
+# Anything else is forwarded to Andrew/hospital_demo.py, so:
 #     auto_sim --llm fake        # rule-based planner, no model server needed
 #     auto_sim --headless        # no window (see below)
 #     auto_sim "go to room one"  # run that first, then drop into the menu
@@ -35,14 +44,18 @@ die() { printf 'auto_sim: %s\n' "$1" >&2; exit 1; }
 # --headless is ours, not hospital_demo.py's: that script takes --gui and
 # defaults to headless. Translating here means the flag people reach for
 # actually works instead of erroring out.
+# --full is ours too: it means "add no quality flags at all", so it has to be
+# swallowed rather than passed to a demo that has no such option.
 want_gui=1
+want_light=1
 forwarded=()
 for arg in "$@"; do
-    if [ "$arg" = "--headless" ]; then
-        want_gui=0
-    else
-        forwarded+=("$arg")
-    fi
+    case "$arg" in
+        --headless) want_gui=0 ;;
+        --full) want_light=0 ;;
+        --light|--minimal) want_light=0; forwarded+=("$arg") ;;
+        *) forwarded+=("$arg") ;;
+    esac
 done
 
 # A GUI run with no display fails deep inside Kit with an unhelpful message,
@@ -52,13 +65,19 @@ if [ "$want_gui" = 1 ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]
   Run this from the machine's own desktop session, or use:  auto_sim --headless"
 fi
 
+quality_flag=()
+[ "$want_light" = 1 ] && quality_flag=(--light)
+
 gui_flag=()
 [ "$want_gui" = 1 ] && gui_flag=(--gui)
 
 cd "$REPO"
 
 echo "auto_sim: booting Isaac Sim -- this takes about two minutes on a cold start."
+echo "auto_sim: the window may sit blank for most of that. It is not stuck."
 echo "auto_sim: the menu appears once the hospital has loaded. Ctrl-C to abort."
 echo
 
-exec "$ISAAC_PY" Andrew/hospital_demo.py "${gui_flag[@]}" --interactive "${forwarded[@]+"${forwarded[@]}"}"
+exec "$ISAAC_PY" Andrew/hospital_demo.py \
+    "${gui_flag[@]}" "${quality_flag[@]}" --interactive \
+    "${forwarded[@]+"${forwarded[@]}"}"
