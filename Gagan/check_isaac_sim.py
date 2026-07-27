@@ -92,7 +92,24 @@ check("has a non-empty world bound", volume > 1.0, f"{volume:.1f} cubic metres")
 
 print("\nStep 2 semantic contract")
 floor = stage.GetPrimAtPath("/FactoryFlowScene/navigable_floor")
-graspable = stage.GetPrimAtPath("/FactoryFlowScene/proxy_graspable")
+
+# Proxy mode emits a single cube literally named "proxy_graspable", but a real
+# SAM 3 run names each object after its label ("chair", "chair_2", "monitor"),
+# so looking the proxy name up by path found nothing on every genuine scan --
+# including gb10_walkthrough, whose six chairs this script was meant to accept.
+# Select on the contract tag instead, which is what Step 2 actually queries.
+graspables = [
+    prim for prim in stage.Traverse()
+    if prim.GetAttribute("factoryflow:kind").Get() == "object"
+]
+graspables.sort(key=lambda p: -(p.GetAttribute("factoryflow:confidence").Get() or 0))
+graspable = graspables[0] if graspables else None
+if graspables:
+    notes.append(
+        f"{len(graspables)} graspable object(s): "
+        + ", ".join(p.GetName() for p in graspables[:12])
+        + (" ..." if len(graspables) > 12 else "")
+    )
 check("navigable floor region present", bool(floor))
 check(
     "floor tagged is_navigable",
@@ -113,20 +130,38 @@ check(
 )
 
 # Is the graspable object actually resting on the floor, not floating or sunk?
+# Proxy mode snaps its cube exactly onto the floor, so there the gap must be
+# zero. A real detection sits whereever SAM 3 saw it, and a small positive gap
+# is normal (a chair seat's box does not reach the ground). Sinking *below* the
+# floor is the genuinely broken case, so that is what stays fatal; the spread is
+# reported either way because it is a useful reconstruction-quality signal.
 if floor and graspable:
     floor_top = (
         floor.GetAttribute("xformOp:translate").Get()[1]
         + floor.GetAttribute("xformOp:scale").Get()[1] / 2
     )
-    object_bottom = (
-        graspable.GetAttribute("xformOp:translate").Get()[1]
-        - graspable.GetAttribute("xformOp:scale").Get()[1] / 2
-    )
-    check(
-        "graspable object rests on the floor",
-        abs(object_bottom - floor_top) < 1e-3,
-        f"gap {object_bottom - floor_top:+.4f} m",
-    )
+
+    def bottom_of(prim):
+        return (
+            prim.GetAttribute("xformOp:translate").Get()[1]
+            - prim.GetAttribute("xformOp:scale").Get()[1] / 2
+        )
+
+    is_proxy = root and root.GetAttribute("factoryflow:proxy").Get() is True
+    if is_proxy:
+        check(
+            "graspable object rests on the floor",
+            abs(bottom_of(graspable) - floor_top) < 1e-3,
+            f"gap {bottom_of(graspable) - floor_top:+.4f} m",
+        )
+    else:
+        gaps = [bottom_of(p) - floor_top for p in graspables]
+        check(
+            "no graspable object sunk below the floor",
+            min(gaps) > -0.05,
+            f"gaps {min(gaps):+.2f} to {max(gaps):+.2f} m "
+            f"(median {sorted(gaps)[len(gaps) // 2]:+.2f})",
+        )
 
 print("\nPhysX (does the floor collider actually stop a body?)")
 floor_top = (

@@ -229,3 +229,66 @@ is Z-up, so PhysX's default -Z gravity is already right. Teammate 1's scanned
 scenes are Y-up per the Step 2 contract, and there Isaac Sim silently gives you
 -Z gravity unless you re-assert the up axis after `initialize_physics()` — see
 `Gagan/README.md`.
+
+## Navigating the real hospital (Isaac tier)
+
+`simbiote/sim_env/isaac_nav.py` drives the trained nav policy through
+`hospital.usd` at true scale, and `simbiote/sim_env/hospital_map.py` is the
+occupancy grid + A* that makes it possible.
+
+```bash
+/home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
+    Suraj/eval_hospital_nav.py --checkpoint checkpoints/nav_bc.pt   # --gui
+/home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
+    Suraj/eval_hospital_nav.py --controller pursuit   # reference, no policy
+```
+
+**Measured: 16/20 ordered location pairs, mean 0.96x path efficiency** (i.e.
+the driven distance is within 4% of the planned path), including a 75 m
+traversal end to end. The straight-at-the-carrot reference controller also
+scores 16/20, so the policy is not yet *better* than a dumb controller here —
+it is equal to it, and both are limited by the same tight corridor.
+
+`nav_bc.pt` is the checkpoint to use. Re-running PPO on top of it
+(`checkpoints/nav_hospital.pt`, 600k steps, 16 envs) left the arena success
+rate unchanged at 53% — the same "PPO on top of BC doesn't help" result already
+recorded above for grasp.
+
+### Why the 4 x 4 m policy can drive a 76 x 42 m building
+
+It isn't asked to. `HospitalMap` A*s the long-range route; the policy is fed a
+carrot 1.6 m ahead on that route, with the robot placed at the *local* origin
+and the goal delta clipped to 1.8 m, so every observation looks like the arena
+it trained in. Its output is a world-frame velocity, which is why the local
+frame is not rotated.
+
+### Things that cost hours, recorded so they don't again
+
+- **Every `Geo_` prim in hospital.usd is `instanceable = true`.** A plain
+  `stage.Traverse()` finds 23 meshes in the entire building instead of 2059,
+  and the occupancy grid comes out empty — which looks exactly like a
+  successful build. Use `Usd.TraverseInstanceProxies`.
+- **`S_WetFloorSign` matches a `"Floor" in name` filter.** It is a 0.79 m tall
+  obstacle in the middle of a corridor, and skipping it as floor geometry left
+  a hole the planner routed straight through. The base then jammed on it in
+  what the grid reported as 2.5 m of open space. The floor test now also
+  requires the prim to be flat and on the ground.
+- **Integrating the base position target off the *measured* joint position
+  cannot work.** The drives are position PD, so commanded-minus-actual is the
+  entire force budget; re-reading the encoder each tick caps the error at one
+  tick of motion and the base stalls against any contact at all. Hold the
+  target internally and clamp how far it may lead (`max_target_lead`, 0.35 m).
+  That clamp is also what keeps the 1e7 stiffness from bulldozing walls.
+- **Inflate the grid by the robot's real half-diagonal (0.62 m), not less.**
+  At 0.45 m, A* returned paths through gaps the base cannot fit and traversals
+  clipped corners at 0.00-0.22 m measured clearance. The building is open-plan
+  enough that 0.65 m costs nothing: all 30 pairs still plan at 0.75 m.
+- **The policy has no behaviour for walls.** `NavEnv` shows it three *point*
+  obstacles in an open box and never puts a wall in the observation, so in a
+  corridor it drifts into the surface and grinds along it. A cross-track term
+  pulling the base back onto the planned line (`cross_track_gain`) took the
+  measured result from 5/20 to 14/20; nothing else moved the number as much.
+- **`teleport()` must set joint state, not a position target.** Driving to a
+  40 m target inside the settle window is 16 m/s, the base never arrives, and
+  the next run starts wherever it stopped — which shows up as a 73 m traversal
+  reporting a 2.9 m path.

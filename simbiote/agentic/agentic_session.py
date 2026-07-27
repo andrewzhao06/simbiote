@@ -26,6 +26,7 @@ from simbiote.agentic.llm_backend import (
 )
 from simbiote.agentic.robot_tools import (
     CheckpointBackend,
+    IsaacBackend,
     RobotBackend,
     RobotTools,
     StubBackend,
@@ -36,6 +37,13 @@ from simbiote.agentic.tool_schema import ToolCall
 from simbiote.robot_iface.actions import RobotAction
 
 __all__ = ["SessionResult", "run_session", "main"]
+
+#: Best-measured nav policy for hospital traversal. `nav_bc.pt` (behavioural
+#: cloning) beats both PPO variants here -- 16/20 location pairs against
+#: nav_ppo's fewer, matching Suraj's finding that PPO on top of BC degrades it.
+DEFAULT_NAV_CHECKPOINT = (
+    Path(__file__).resolve().parent.parent.parent / "checkpoints" / "nav_bc.pt"
+)
 
 
 @dataclass
@@ -190,8 +198,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--robot",
         default="stub",
-        choices=["stub", "checkpoint"],
-        help="skill-execution backend (default: stub; 'checkpoint' needs Step 2's exports)",
+        choices=["stub", "checkpoint", "isaac"],
+        help=(
+            "skill-execution backend (default: stub). 'checkpoint' runs Step 2's "
+            "exports in a throwaway PyBullet arena; 'isaac' drives the real robot "
+            "through hospital.usd and keeps its pose between skills"
+        ),
+    )
+    parser.add_argument(
+        "--isaac-gui",
+        action="store_true",
+        help="show the Isaac Sim window when --robot isaac (default: headless)",
     )
     parser.add_argument("--nav-checkpoint", default="", help="path for --robot checkpoint")
     parser.add_argument("--grasp-checkpoint", default="", help="path for --robot checkpoint")
@@ -267,11 +284,18 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         ),
     )
-    robot: RobotBackend = (
-        StubBackend(fail_skills=tuple(args.fail_skill))
-        if args.robot == "stub"
-        else CheckpointBackend(args.nav_checkpoint, args.grasp_checkpoint)
-    )
+    if args.robot == "stub":
+        robot: RobotBackend = StubBackend(fail_skills=tuple(args.fail_skill))
+    elif args.robot == "isaac":
+        # Booting Isaac Sim and cooking the hospital's colliders takes a while,
+        # so this is constructed only when actually selected.
+        robot = IsaacBackend(
+            nav_checkpoint=args.nav_checkpoint or str(DEFAULT_NAV_CHECKPOINT),
+            grasp_checkpoint=args.grasp_checkpoint or None,
+            headless=not args.isaac_gui,
+        )
+    else:
+        robot = CheckpointBackend(args.nav_checkpoint, args.grasp_checkpoint)
 
     if args.preflight:
         ready = _run_preflight(llm, args)

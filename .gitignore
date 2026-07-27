@@ -217,6 +217,14 @@ cmake-build-*/
 # --- Jupyter ---
 *-checkpoint.ipynb
 
+# --- Build artifacts kept on disk, not in history ---
+# Locally-built aarch64 wheels (pybullet, ~97 MB): reproducible from source
+# against Isaac Sim's bundled Python headers, see scripts/gb10/.
+.wheelhouse/
+# Dense reconstruction output (~64 MB): regenerable from the captures.
+Gagan/out/dense/
+scripts/gb10/harness/reports/.watch.lock
+
 # --- Misc ---
 *.bak
 *.tmp

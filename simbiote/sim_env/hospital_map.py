@@ -42,12 +42,17 @@ DEFAULT_HOSPITAL_USD = (
 # is folded. Matches the band check_isaac_hospital.py used to find its spawn.
 Z_BAND = (0.15, 1.6)
 
-# Ridgeback footprint is 0.96 x 0.79 m, so the circumscribing radius is ~0.62 m.
-# Inflating the grid by that much makes A* paths that a *point* robot could take
-# unavailable, which is the point -- but it also seals doorways narrower than
-# 1.24 m. 0.45 m is the working compromise: wide enough that the base clears
-# door frames it plans through, tight enough that interior doors stay open.
-ROBOT_RADIUS = 0.45
+# The Ridgeback's footprint is 0.96 x 0.79 m, so it circumscribes at ~0.62 m
+# and the grid has to be inflated by at least that or A* returns paths through
+# gaps the base physically cannot fit. Planning at 0.45 m did exactly that:
+# traversals clipped corners and jammed against door frames at measured
+# clearances of 0.00-0.22 m.
+#
+# The obvious worry is sealing doorways, but this hospital is open-plan -- the
+# whole reachable region stays one connected component even when eroded by
+# 0.85 m, and all 30 ordered location pairs still plan at 0.75 m. 0.65 m clears
+# the base with a small margin for yaw and the folded arm.
+ROBOT_RADIUS = 0.65
 
 GRID_RESOLUTION = 0.10  # metres per cell
 
@@ -158,7 +163,18 @@ def _world_bounds_in_band(
             continue
         lo, hi = box.GetMin(), box.GetMax()
 
-        is_floor = any("Floor" in name for name in ancestry)
+        # Naming alone is not enough: `S_WetFloorSign` contains "Floor" and is
+        # a 0.79 m tall obstacle sitting in the middle of a corridor. Skipping
+        # it as floor left a hole in the grid that the planner routed straight
+        # through, and the base jammed on it in what looked like open space
+        # (2.5 m of apparent clearance). Require the prim to actually be flat
+        # and on the ground before believing the name.
+        thickness = float(hi[2] - lo[2])
+        is_floor = (
+            any("Floor" in name for name in ancestry)
+            and thickness < 0.3
+            and float(lo[2]) < 0.3
+        )
         if is_floor:
             floor_min_x = min(floor_min_x, lo[0])
             floor_min_y = min(floor_min_y, lo[1])

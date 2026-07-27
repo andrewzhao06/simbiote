@@ -81,6 +81,7 @@ class TeleopSession:
         mirror: bool = True,
         rotate: int = 0,
         threaded_camera: bool = True,
+        camera_retries: int = 5,
     ):
         self.robot_sink = robot_sink
         self.target_fps = target_fps
@@ -95,6 +96,7 @@ class TeleopSession:
             source=camera_source,
             rotate=rotate,
             threaded=threaded_camera,
+            open_retries=camera_retries,
         )
         self.backend = resolve_backend(backend)
         self.hand_tracker = create_tracker(self.backend)
@@ -220,6 +222,12 @@ def main() -> None:
              "default (it stops camera latency and inference time from adding up); turn it "
              "off when feeding a video file, where dropping frames loses data.",
     )
+    parser.add_argument(
+        "--camera-retries", type=int, default=5,
+        help="Retries (2s apart) when the camera won't open. Phone webcam servers accept "
+             "one client at a time, so raise this to wait for the app to start serving "
+             "rather than health-checking the stream first -- a probe takes the slot.",
+    )
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--session-id", type=str, default=None)
     parser.add_argument("--max-frames", type=int, default=None, help="Stop after N frames (omit to run until Ctrl+C or 'q').")
@@ -255,6 +263,7 @@ def main() -> None:
         mirror=not args.no_mirror,
         rotate=args.rotate,
         threaded_camera=not args.no_threaded_camera,
+        camera_retries=args.camera_retries,
     )
 
     print(

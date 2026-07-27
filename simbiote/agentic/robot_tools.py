@@ -34,6 +34,7 @@ __all__ = [
     "RobotBackend",
     "StubBackend",
     "CheckpointBackend",
+    "IsaacBackend",
     "RobotTools",
     "ActionSink",
 ]
@@ -291,6 +292,181 @@ class CheckpointBackend:
             "per-call helpers don't expose. Use StubBackend for this skill "
             "until that lands."
         )
+
+
+class IsaacBackend:
+    """Runs the nav skills against a live `hospital.usd` under Isaac Sim.
+
+    The difference from :class:`CheckpointBackend` is that this one owns a
+    *persistent* simulator. `CheckpointBackend` spins up a throwaway 4 x 4 m
+    PyBullet arena per call and squeezes the hospital's coordinates onto it, so
+    every skill in a compound plan starts the robot back at the arena origin
+    and "go to the supply room, then to room 1" never actually crosses a
+    building. Here the robot keeps its pose between skills: step two starts
+    wherever step one finished, which is what the executor's FSM has always
+    assumed and what makes a multi-step instruction mean anything.
+
+    Holding the handle is also what the `NotImplementedError` in
+    `CheckpointBackend` was waiting on. The wheelchair *navigation* halves
+    (`approach_wheelchair`, `nav_with_payload`) are wired here because they are
+    the nav policy driving to a scene location. `align_gripper` /
+    `attach_handle` / `detach` still are not: they need the Franka driven to a
+    handle pose by IK and a PhysX joint formed against the wheelchair, and
+    neither the arm controller nor a wheelchair prim exists in the hospital
+    scene. Faking a success there would make the executor's compensation path
+    report a release that never happened, so they stay explicit.
+
+    `pick_up` delegates to Step 2's PyBullet grasp checkpoint. That is a real
+    trained policy, but it runs in its own tabletop scene rather than on the
+    hospital robot -- the arm here is folded for driving. The result says so.
+    """
+
+    def __init__(
+        self,
+        *,
+        nav_checkpoint: str,
+        grasp_checkpoint: str | None = None,
+        headless: bool = True,
+        hospital: Any = None,
+    ) -> None:
+        self.nav_checkpoint = nav_checkpoint
+        self.grasp_checkpoint = grasp_checkpoint
+        # Accept an already-booted hospital so a GUI session can hand in the
+        # window it is rendering rather than starting a second simulator.
+        if hospital is None:
+            from simbiote.sim_env.isaac_nav import IsaacHospital
+
+            hospital = IsaacHospital(headless=headless, checkpoint=nav_checkpoint)
+        self.hospital = hospital
+
+        # Kit is main-thread-only, but task_executor runs skills in a worker
+        # thread. Everything that touches the simulator goes through here.
+        from simbiote.sim_env.isaac_nav import MainThreadBridge
+
+        self.bridge = MainThreadBridge()
+
+    # -- helpers ------------------------------------------------------------
+
+    def _goal_for(self, scene: SceneGraph, location_id: str):
+        """Resolve a scene-graph location to hospital coordinates.
+
+        The scene graph's poses are a hand-written *layout* spanning ~14 x 24 m
+        around the origin, not hospital.usd coordinates, so they are looked up
+        in `HOSPITAL_LOCATIONS` instead of used directly. An id with no anchor
+        is a hard failure rather than a silent fallback to the raw pose, which
+        would drive the robot to a point outside the building.
+        """
+        from simbiote.sim_env.hospital_map import HOSPITAL_LOCATIONS
+
+        if location_id in self.hospital.locations:
+            return self.hospital.locations[location_id]
+        if location_id in HOSPITAL_LOCATIONS:
+            return HOSPITAL_LOCATIONS[location_id]
+        return None
+
+    def _navigate(
+        self, skill: str, location_id: str, scene: SceneGraph, on_action: ActionSink | None
+    ) -> SkillResult:
+        if scene.get_location(location_id) is None:
+            return SkillResult(False, f"unknown location {location_id!r}")
+        goal = self._goal_for(scene, location_id)
+        if goal is None:
+            return SkillResult(
+                False,
+                f"location {location_id!r} has no hospital.usd anchor; add one to "
+                "simbiote.sim_env.hospital_map.HOSPITAL_LOCATIONS",
+            )
+
+        from simbiote.sim_env.isaac_nav import CONTROL_HZ
+
+        result = self.bridge.call(
+            lambda: self.hospital.navigate_to(location_id, goal_xy=goal, trace=True)
+        )
+
+        actions: list[RobotAction] = []
+        # Log the driven path, thinned: a 75 m traversal is ~2200 control ticks
+        # and the demo log only needs the shape of the route. `RobotAction`
+        # carries a base *velocity*, not a pose, so emit the mean velocity over
+        # each thinned interval -- that is what a BC pass would want to imitate.
+        trace = result.trace or []
+        stride = max(len(trace) // 40, 1)
+        samples = trace[::stride]
+        interval = stride / CONTROL_HZ
+        for index in range(1, len(samples)):
+            (px, py), (x, y) = samples[index - 1], samples[index]
+            action = RobotAction(
+                base_velocity=(
+                    round((x - px) / interval, 4),
+                    round((y - py) / interval, 4),
+                    0.0,
+                ),
+                arm_target_pose=None,
+                gripper_state=GripperState.OPEN,
+            )
+            actions.append(action)
+            if on_action is not None:
+                on_action(action, skill)
+
+        return SkillResult(result.success, f"{skill}({location_id}) -> {result.to_dict()}", actions)
+
+    # -- backend protocol ---------------------------------------------------
+
+    def run_skill(
+        self,
+        skill: str,
+        args: dict[str, Any],
+        scene: SceneGraph,
+        on_action: ActionSink | None = None,
+    ) -> SkillResult:
+        if skill in ("navigate_to", "nav_with_payload"):
+            return self._navigate(skill, args["location_id"], scene, on_action)
+
+        if skill == "approach_wheelchair":
+            # Addressed by object id, but the motion is base navigation, so it
+            # resolves to the location the object sits in.
+            obj = scene.get_object(args["object_id"])
+            if obj is None:
+                return SkillResult(False, f"unknown object {args['object_id']!r}")
+            location_id = getattr(obj, "location_id", None)
+            if location_id is None:
+                return SkillResult(
+                    False,
+                    f"object {obj.id!r} has no location_id; cannot resolve a "
+                    "hospital anchor to drive to",
+                )
+            return self._navigate(skill, location_id, scene, on_action)
+
+        if skill == "pick_up":
+            if self.grasp_checkpoint is None:
+                return SkillResult(False, "no grasp checkpoint configured")
+            obj_id = args["object_id"]
+            obj = scene.get_object(obj_id)
+            if obj is None:
+                return SkillResult(False, f"unknown object {obj_id!r}")
+            from simbiote.robot_iface import skills as robot_skills
+
+            info = robot_skills.pick_up(
+                obj_id,
+                checkpoint_path=self.grasp_checkpoint,
+                objects={obj_id: (obj.pose.x, obj.pose.y, obj.pose.z)},
+            )
+            ok = bool(info.get("success", False))
+            return SkillResult(
+                ok,
+                f"pick_up({obj_id}) -> {info} [PyBullet grasp tier, not the "
+                "hospital arm]",
+            )
+
+        raise NotImplementedError(
+            f"IsaacBackend has no wiring for {skill!r}. The persistent handle "
+            "it needed now exists, but align_gripper/attach_handle/detach also "
+            "need the Franka driven to a handle pose by IK and a PhysX joint "
+            "formed against a wheelchair prim, neither of which is in "
+            "hospital.usd. Use StubBackend for those."
+        )
+
+    def close(self) -> None:
+        self.hospital.close()
 
 
 class RobotTools:

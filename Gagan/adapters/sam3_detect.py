@@ -134,21 +134,59 @@ def usable_frame_count(video: Path, timestamps: np.ndarray) -> int:
     relative = timestamps - timestamps[0]
     count = min(len(pts), len(relative))
     interval = float(np.median(np.diff(relative))) if len(relative) > 1 else 0.0
-    drift = np.abs(pts[:count] - relative[:count])
-    if interval and drift.max() > interval / 2:
-        first = int(np.argmax(drift > interval / 2))
-        raise RuntimeError(
-            f"{video.name} desynchronises from odometry at frame {first} "
-            f"(drift {drift[first]:.4f}s > half a {interval:.4f}s frame). "
-            "Frames were dropped mid-stream; pairing by position would attach "
-            "the wrong pose to everything after that point."
-        )
+    if not interval or count < 2:
+        return count
+
+    # The container's declared frame rate is not always the rate the capture
+    # ran at. scan-0855cbfdfd is 30 Hz content tagged 60 fps: its PTS advance
+    # at exactly half the odometry rate, so raw drift reaches 10 s across a
+    # 21 s capture even though the frames pair 1:1 (confirmed by correlating
+    # RGB edges against the depth maps -- the match peaks at the 1:1 index at
+    # every probe, never at the half index). A wrong tag rescales the whole
+    # PTS axis and cannot reorder frames, so put PTS on the odometry timebase
+    # before looking for drops. Only do this when the frame counts already say
+    # the streams are 1:1; if the video really did carry twice the frames, the
+    # counts would differ ~2x and rescaling would hide a genuine mismatch.
+    video_interval = float(np.median(np.diff(pts))) if len(pts) > 1 else 0.0
+    if video_interval > 0 and abs(len(pts) - len(relative)) <= 0.05 * len(relative):
+        pts = pts * (interval / video_interval)
+
+    drift = pts[:count] - relative[:count]
+
+    # Both clocks free-run, so a few us per frame of skew accumulates over a
+    # long capture (~5 us/frame here, 18 ms across d6724d7d8d's 60 s). That is
+    # a straight line and harms nothing; subtract it before judging.
+    index = np.arange(count)
+    slope, intercept = np.polyfit(index, drift, 1)
+    residual = drift - (slope * index + intercept)
+
+    # What actually breaks index pairing is a *persistent* shift: drop a frame
+    # and every later frame inherits the offset. Stray Scanner's ordinary
+    # jitter instead bumps a single frame by one interval and recovers on the
+    # next (40 such blips in d6724d7d8d, all self-correcting). Comparing the
+    # median of the window behind each frame with the window ahead of it keeps
+    # the original guard's intent while ignoring blips that heal.
+    window = max(5, int(round(0.5 / interval)))  # ~half a second of frames
+    if count > 2 * window:
+        windows = np.lib.stride_tricks.sliding_window_view(residual, window)
+        medians = np.median(windows, axis=1)          # medians[i] covers [i, i+window)
+        shifts = medians[window:] - medians[:-window]  # ahead-of-i minus behind-i
+        worst = int(np.argmax(np.abs(shifts)))
+        if abs(shifts[worst]) > interval / 2:
+            raise RuntimeError(
+                f"{video.name} desynchronises from odometry at frame "
+                f"{worst + window} (pairing shifts by {shifts[worst]:.4f}s and "
+                f"stays shifted; one frame is {interval:.4f}s). Frames were "
+                "dropped mid-stream; pairing by position would attach the wrong "
+                "pose to everything after that point."
+            )
+
     if len(pts) < len(relative):
         print(
             f"[sam3] note: {video.name} is truncated -- {len(pts)} frames for "
             f"{len(relative)} odometry rows. The first {count} align to within "
-            f"{drift.max():.4f}s, so the tail was simply never encoded; "
-            "ignoring the trailing rows."
+            f"{np.abs(residual).max():.4f}s of a straight line, so the tail was "
+            "simply never encoded; ignoring the trailing rows."
         )
     return count
 
