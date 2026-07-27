@@ -30,6 +30,8 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
+import time
 from pathlib import Path
 
 sys.stdout.reconfigure(line_buffering=True)
@@ -153,10 +155,54 @@ llm = make_backend(args.llm, scene, profile=args.profile)
 print(f"planner: {describe_backend(llm)}\n")
 
 
+def run_session_pumped(instruction: str):
+    """Run one instruction with the main thread left free to serve the sim.
+
+    task_executor puts each skill on a worker thread (so a wedged skill can be
+    abandoned on timeout), and IsaacBackend routes every simulator call back to
+    the main thread through MainThreadBridge, because Kit aborts the process if
+    stepped from anywhere else.
+
+    Calling run_session() straight from the main thread therefore deadlocks:
+    the worker blocks in bridge.call() waiting for the main thread to pump the
+    queue, while the main thread is blocked inside run_session waiting on the
+    worker's future. Nothing moves until the executor's timeout fires. The
+    window keeps its last frame, so it looks exactly like a freeze.
+
+    So: run the session on a worker of our own, and spend the main thread
+    pumping the bridge and the app -- the same shape hospital_server.py uses.
+    """
+
+    box: dict = {}
+
+    def target() -> None:
+        try:
+            box["result"] = run_session(instruction, scene, llm, robot, stage=args.stage)
+        except BaseException as exc:  # noqa: BLE001 - re-raised on the main thread
+            box["error"] = exc
+
+    worker = threading.Thread(target=target, name="session", daemon=True)
+    worker.start()
+    while worker.is_alive():
+        # pump() returns False when the queue is empty; only then is it worth
+        # spending time on a frame, so simulator work never waits behind one.
+        if not robot.bridge.pump():
+            hospital.spin()
+            time.sleep(0.01)
+    worker.join()
+    # Drain anything the worker queued as it finished.
+    while robot.bridge.pump():
+        pass
+
+    if "error" in box:
+        raise box["error"]
+    return box["result"]
+
+
 def run(instruction: str) -> bool:
     print(f'> "{instruction}"')
     before = hospital.base_xy()
-    result = run_session(instruction, scene, llm, robot, stage=args.stage)
+    result = run_session_pumped(instruction)
 
     if result.error:
         print(f"  could not plan: {result.error}\n")
