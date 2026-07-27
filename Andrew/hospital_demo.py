@@ -29,6 +29,7 @@ Defaults to the local OpenAI-compatible server (vLLM on :8000). Add
 from __future__ import annotations
 
 import argparse
+import select
 import sys
 import threading
 import time
@@ -235,6 +236,34 @@ for instruction in args.instructions:
     ok += run(instruction)
 
 
+def prompt_with_spin(prompt: str) -> str:
+    """Read a line of input while keeping the Isaac Sim window alive.
+
+    input() blocks the calling thread, and the main thread is the only one
+    allowed to pump Kit. Since this program spends nearly all of its time
+    sitting at the menu waiting for a keystroke, using input() means the window
+    stops updating for minutes at a stretch -- so the desktop decides the app
+    has hung and offers to force quit it. Nothing has actually crashed; the
+    render loop is just never given a turn.
+
+    Polling stdin instead lets the gaps between keystrokes go to the renderer.
+    select() on stdin is fine for a terminal or a pipe, which is all this is
+    ever driven by.
+    """
+
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    while True:
+        ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+        if ready:
+            line = sys.stdin.readline()
+            if not line:  # EOF -- treated by the caller as "quit"
+                raise EOFError
+            return line.strip()
+        if args.gui:
+            hospital.spin()
+
+
 def show_menu() -> None:
     # No leading blank line: both callers already end their output with one.
     for number, command in enumerate(CANNED_COMMANDS, start=1):
@@ -250,7 +279,7 @@ if args.interactive:
         # park needs the choices in front of them again, not scrollback.
         show_menu()
         try:
-            choice = input("choose> ").strip()
+            choice = prompt_with_spin("choose> ")
         except (EOFError, KeyboardInterrupt):
             break
         if not choice:
