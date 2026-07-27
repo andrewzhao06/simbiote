@@ -18,7 +18,7 @@ finished.
         Andrew/hospital_demo.py --gui --hold \
         "go to the supply room" "now take it to room one"
 
-    # type them yourself
+    # pick from a menu of canned commands, over and over
     /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
         Andrew/hospital_demo.py --gui --interactive
 
@@ -37,10 +37,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 REPO = Path(__file__).resolve().parent.parent
 
+#: The canned commands `--interactive` offers. Edit this list to change the
+#: menu -- it is the only place the demo's instructions are written down.
+#:
+#: They are phrased the way an operator would say them, not as tool calls: the
+#: whole point of the demo is that the LLM turns the sentence into
+#: `navigate_to(<id>)`, so pre-resolving them here would skip the step being
+#: shown. Both phrases resolve through the scene graph's aliases.
+CANNED_COMMANDS = (
+    "go to the nurse station",
+    "go to the supply room",
+)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("instructions", nargs="*", help="natural-language commands")
 parser.add_argument("--gui", action="store_true", help="show the Isaac Sim window")
-parser.add_argument("--interactive", action="store_true", help="read instructions from stdin")
+parser.add_argument(
+    "--interactive",
+    action="store_true",
+    help="pick canned commands from a menu, redisplayed after each run",
+)
 parser.add_argument("--hold", action="store_true", help="keep the window up after the last command")
 parser.add_argument("--llm", default="openai-compat", choices=["openai-compat", "fake"])
 parser.add_argument(
@@ -130,19 +146,47 @@ for instruction in args.instructions:
     total += 1
     ok += run(instruction)
 
+
+def show_menu() -> None:
+    # No leading blank line: both callers already end their output with one.
+    for number, command in enumerate(CANNED_COMMANDS, start=1):
+        print(f"  [{number}] {command}")
+    print("  [q] quit")
+    print()
+
+
 if args.interactive:
-    print("Type an instruction, or 'quit'.\n")
     while True:
+        # Reprinted every pass. A run takes tens of seconds and scrolls the
+        # menu off the screen, so an operator who has just watched the robot
+        # park needs the choices in front of them again, not scrollback.
+        show_menu()
         try:
-            line = input("instruction> ").strip()
+            choice = input("choose> ").strip()
         except (EOFError, KeyboardInterrupt):
             break
-        if not line:
+        if not choice:
             continue
-        if line.lower() in ("quit", "exit"):
+        if choice.lower() in ("q", "quit", "exit"):
             break
+
+        if choice.isdigit():
+            # A number is always a menu pick. An out-of-range one is a
+            # mis-key, so say so rather than sending "9" to the planner as an
+            # instruction and letting it come back as a baffling plan failure.
+            index = int(choice)
+            if not 1 <= index <= len(CANNED_COMMANDS):
+                print(f"  no option {choice} -- pick 1-{len(CANNED_COMMANDS)}, or q to quit\n")
+                continue
+            instruction = CANNED_COMMANDS[index - 1]
+        else:
+            # Anything else is still sent through as a free-text instruction,
+            # so the demo does not lose the ability to try a phrasing that is
+            # not on the list.
+            instruction = choice
+
         total += 1
-        ok += run(line)
+        ok += run(instruction)
 
 print(f"{ok}/{total} instructions completed")
 
