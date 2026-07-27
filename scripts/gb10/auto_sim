@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# auto_sim -- open the hospital in Isaac Sim with a menu of canned commands.
+#
+# Type `auto_sim`. It boots Isaac Sim, loads hospital.usd, spawns the
+# Ridgeback + Franka, and then sits on a numbered menu:
+#
+#     [1] go to the nurse station
+#     [2] go to the supply room
+#     [q] quit
+#
+# Pick a number and the robot drives there. The menu comes back afterwards.
+#
+# Anything passed to auto_sim is forwarded to Andrew/hospital_demo.py, so:
+#     auto_sim --llm fake        # rule-based planner, no model server needed
+#     auto_sim --headless        # no window (see below)
+#     auto_sim "go to room one"  # run that first, then drop into the menu
+#
+# For a one-shot run with no menu, call the demo directly:
+#     Andrew/hospital_demo.py --gui "go to room one"
+#
+# Edit the menu itself in CANNED_COMMANDS at the top of
+# Andrew/hospital_demo.py.
+
+set -euo pipefail
+
+REPO="${SIMBIOTE_REPO:-/home/dell/simbiote-Gagan1_Suraj2_Sky3_Andrew4}"
+ISAAC_PY="${ISAAC_PYTHON:-/home/dell/IsaacSim/_build/linux-aarch64/release/python.sh}"
+
+die() { printf 'auto_sim: %s\n' "$1" >&2; exit 1; }
+
+[ -d "$REPO" ] || die "repo not found at $REPO (override with SIMBIOTE_REPO=...)"
+[ -x "$ISAAC_PY" ] || die "Isaac Sim's python.sh not found at $ISAAC_PY (override with ISAAC_PYTHON=...)"
+[ -f "$REPO/Andrew/hospital_demo.py" ] || die "$REPO/Andrew/hospital_demo.py is missing"
+
+# --headless is ours, not hospital_demo.py's: that script takes --gui and
+# defaults to headless. Translating here means the flag people reach for
+# actually works instead of erroring out.
+want_gui=1
+forwarded=()
+for arg in "$@"; do
+    if [ "$arg" = "--headless" ]; then
+        want_gui=0
+    else
+        forwarded+=("$arg")
+    fi
+done
+
+# A GUI run with no display fails deep inside Kit with an unhelpful message,
+# so catch it here where we can say what to do about it.
+if [ "$want_gui" = 1 ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    die "no display detected (\$DISPLAY is empty).
+  Run this from the machine's own desktop session, or use:  auto_sim --headless"
+fi
+
+gui_flag=()
+[ "$want_gui" = 1 ] && gui_flag=(--gui)
+
+cd "$REPO"
+
+echo "auto_sim: booting Isaac Sim -- this takes about two minutes on a cold start."
+echo "auto_sim: the menu appears once the hospital has loaded. Ctrl-C to abort."
+echo
+
+exec "$ISAAC_PY" Andrew/hospital_demo.py "${gui_flag[@]}" --interactive "${forwarded[@]+"${forwarded[@]}"}"
