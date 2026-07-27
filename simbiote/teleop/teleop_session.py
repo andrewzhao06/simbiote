@@ -82,6 +82,7 @@ class TeleopSession:
         rotate: int = 0,
         threaded_camera: bool = True,
         camera_retries: int = 5,
+        max_reconnects: int = 20,
     ):
         self.robot_sink = robot_sink
         self.target_fps = target_fps
@@ -98,6 +99,14 @@ class TeleopSession:
             threaded=threaded_camera,
             open_retries=camera_retries,
         )
+        # Remembered so a reconnect can rebuild the same source. Take it from
+        # the opened camera, which has already resolved env-var fallbacks.
+        self._camera_source_resolved = self.camera.source
+        self._rotate = rotate
+        self._threaded_camera = threaded_camera
+        self._camera_retries = camera_retries
+        self.max_reconnects = max_reconnects
+        self._reconnects = 0
         self.backend = resolve_backend(backend)
         self.hand_tracker = create_tracker(self.backend)
         self.ik_bridge = IKBridge()
@@ -125,16 +134,16 @@ class TeleopSession:
 
                 frame = self.camera.read()
                 if frame is None:
-                    # A dropped frame is normal; a run of them means the phone
-                    # stopped streaming (backgrounded, off Wi-Fi) or the file
-                    # ended. Bail out instead of spinning forever.
+                    # A dropped frame is normal; a run of them means the stream
+                    # died. For a phone that's routine rather than fatal -- iOS
+                    # suspends a backgrounded DroidCam and its socket stops
+                    # delivering -- so try to pick the stream back up instead of
+                    # ending the session and losing the trajectory so far.
                     dropped += 1
                     if dropped >= MAX_CONSECUTIVE_DROPS:
-                        print(
-                            f"[teleop] camera gave no frame {dropped} times in a row "
-                            f"({self.camera.source}) -- stopping."
-                        )
-                        break
+                        if not self._reconnect_camera():
+                            break
+                        dropped = 0
                     continue
                 dropped = 0
 
@@ -169,6 +178,46 @@ class TeleopSession:
             self.stop()
 
         return self.session_id
+
+    def _reconnect_camera(self) -> bool:
+        """Reopen the camera after the stream went dead. False = give up.
+
+        The robot keeps whatever it was last told until frames resume; the
+        Isaac side independently stops the base once commands go stale, so a
+        reconnect gap is safe rather than a runaway.
+        """
+
+        if self._reconnects >= self.max_reconnects:
+            print(
+                f"[teleop] camera stayed dead after {self._reconnects} reconnect "
+                f"attempts ({self.camera.source}) -- stopping."
+            )
+            return False
+
+        self._reconnects += 1
+        print(
+            f"[teleop] camera stopped delivering frames -- reconnecting "
+            f"({self._reconnects}/{self.max_reconnects}). Is the phone app foregrounded?"
+        )
+        try:
+            self.camera.release()
+        except Exception:  # noqa: BLE001 - it's already broken
+            pass
+
+        try:
+            self.camera = open_camera(
+                source=self._camera_source_resolved,
+                fps=self.target_fps,
+                rotate=self._rotate,
+                threaded=self._threaded_camera,
+                open_retries=self._camera_retries,
+            )
+        except RuntimeError as exc:
+            print(f"[teleop] reconnect failed: {exc}")
+            return False
+
+        print(f"[teleop] camera back: {self.camera.width}x{self.camera.height}")
+        return True
 
     def stop(self) -> None:
         self._running = False
@@ -228,6 +277,12 @@ def main() -> None:
              "one client at a time, so raise this to wait for the app to start serving "
              "rather than health-checking the stream first -- a probe takes the slot.",
     )
+    parser.add_argument(
+        "--max-reconnects", type=int, default=20,
+        help="How many times to reopen the camera if the stream dies mid-session. "
+             "iOS suspending a backgrounded phone-webcam app is routine, so teleop "
+             "waits for it to come back rather than ending the session.",
+    )
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--session-id", type=str, default=None)
     parser.add_argument("--max-frames", type=int, default=None, help="Stop after N frames (omit to run until Ctrl+C or 'q').")
@@ -264,6 +319,7 @@ def main() -> None:
         rotate=args.rotate,
         threaded_camera=not args.no_threaded_camera,
         camera_retries=args.camera_retries,
+        max_reconnects=args.max_reconnects,
     )
 
     print(

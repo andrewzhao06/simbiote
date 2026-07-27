@@ -13,10 +13,12 @@ Trying to steer the base and pose the arm simultaneously with one hand makes
 them fight: tilting to steer would drag the gripper along with it.
 
 DRIVE mode (open hand):
-  - Wrist offset from frame center -> base_velocity (vx from vertical
-    offset, omega from horizontal offset), with a deadzone so small
-    tracking jitter near center doesn't drive the base. vy (strafing) is
-    left at 0.0 -- full omnidirectional mapping is a cuMotion refinement.
+  - Hand *pitch* -> forward/back. Curl the hand toward the camera to go
+    forward, fold it back to reverse. This replaced wrist height, which
+    only ever worked one way round -- see PITCH_DEADZONE.
+  - Wrist offset left/right of frame centre -> turn, with a deadzone so
+    tracking jitter near centre doesn't steer. vy (strafing) is left at
+    0.0 -- full omnidirectional mapping is a cuMotion refinement.
   - The arm target is *held*, so the gripper doesn't wander while driving.
   - Gripper open.
 
@@ -81,6 +83,22 @@ PINCH_RELEASE_RATIO = 0.50  # must open past this to leave manipulate mode
 # to reach the very top and bottom of frame, where tracking is least reliable.
 MANIPULATE_Y_SPAN = 0.7
 
+# Forward/back comes from hand *pitch* -- how far the fingers tilt toward or
+# away from the camera -- not from where the hand sits in frame. Curling the
+# hand forward drives forward; folding it back drives back.
+#
+# Wrist height was the original signal and it only worked in one direction:
+# curling forward incidentally lifts the wrist a little (so it read as
+# forward), but folding back doesn't lower it, so reverse was unreachable
+# without deliberately dropping the whole hand down the frame. Pitch is the
+# gesture the operator is actually making, and it's symmetric.
+#
+# Measured as the palm vector's depth component over the palm's own 3D length,
+# so it's scale- and distance-invariant. Needs a backend with real depth --
+# WiLoR has it, which is why this wasn't viable on MediaPipe.
+PITCH_DEADZONE = 0.12  # |pitch| below this is a level hand: no drive
+PITCH_FULL_SCALE = 0.55  # |pitch| at which forward/back is commanded at full gain
+
 BASE_DEADZONE = 0.10  # fraction of half-frame from center with no base motion
 BASE_FORWARD_GAIN = 0.6  # m/s at full vertical deflection
 BASE_TURN_GAIN = 1.2  # rad/s at full horizontal deflection
@@ -105,6 +123,25 @@ def _remap(value: float, in_lo: float, in_hi: float, out_lo: float, out_hi: floa
 
 def _lerp(a: float, b: float, alpha: float) -> float:
     return float(a + alpha * (b - a))
+
+
+def hand_pitch(pts) -> float:
+    """Signed hand tilt, normalised by palm length.
+
+    Negative -> fingers tilted toward the camera (hand curled forward).
+    Positive -> fingers tilted away from it (hand folded back).
+
+    Uses the palm vector's depth component, following the landmark convention
+    that smaller z is closer to the camera. Dividing by the palm's own 3D
+    length makes it independent of hand size and of how far away the operator
+    is standing. Measured on real hands, this spans roughly -0.9 to +1.0.
+    """
+
+    wrist, mcp = pts[WRIST], pts[MIDDLE_MCP]
+    palm = math.dist(mcp[:3], wrist[:3])
+    if palm < 1e-6:
+        return 0.0
+    return float((mcp[2] - wrist[2]) / palm)
 
 
 class ControlMode(str, Enum):
@@ -140,6 +177,11 @@ class IKBridge:
     mirror_x: bool = False  # flip left/right if the camera view is mirrored
     _last_action: RobotAction = None  # type: ignore[assignment]
     mode: ControlMode = ControlMode.DRIVE
+    # WiLoR gives reliable depth; MediaPipe's z is noisy. See _pinch_ratio.
+    use_3d_pinch: bool = True
+    # Forward/back from hand tilt rather than hand height. Needs real depth,
+    # so set False for MediaPipe. See PITCH_DEADZONE.
+    drive_from_pitch: bool = True
 
     def __post_init__(self) -> None:
         if self._last_action is None:
@@ -148,6 +190,42 @@ class IKBridge:
     def reset(self) -> None:
         self._last_action = neutral_action()
         self.mode = ControlMode.DRIVE
+
+    def _pinch_ratio(self, pts) -> float:
+        """Thumb-to-index distance over palm length, measured in 3D.
+
+        Measuring this on the 2D projection makes folding the hand *back* read
+        as a pinch: the fingers tilt away from the camera, so the thumb and
+        index tips project close together even though they're far apart in
+        space. Since backing the robot up is exactly that gesture, reversing
+        kept getting swallowed by an accidental switch into manipulate mode --
+        measured at 26% of backward attempts versus 9% of forward ones.
+
+        WiLoR predicts real root-relative 3D joints, so including z removes the
+        foreshortening by construction. Normalising by the palm's own 3D length
+        keeps it distance-invariant, as before.
+
+        Backends with unreliable depth (MediaPipe's z is noisy) can set
+        `use_3d_pinch=False`; with z all-zero this reduces exactly to the old
+        2D measure.
+        """
+
+        thumb, index = pts[THUMB_TIP], pts[INDEX_TIP]
+        wrist, mcp = pts[WRIST], pts[MIDDLE_MCP]
+
+        if self.use_3d_pinch:
+            pinch = math.dist(thumb[:3], index[:3])
+            palm = math.dist(mcp[:3], wrist[:3])
+        else:
+            pinch = math.hypot(thumb[0] - index[0], thumb[1] - index[1])
+            palm = math.hypot(mcp[0] - wrist[0], mcp[1] - wrist[1])
+
+        return pinch / palm if palm > 1e-6 else 1.0
+
+    def hand_pitch(self, pts) -> float:
+        """See module-level `hand_pitch`."""
+
+        return hand_pitch(pts)
 
     def _update_mode(self, pinch_ratio: float) -> ControlMode:
         """Pinch to enter manipulate mode, open past a wider gap to leave it."""
@@ -175,15 +253,7 @@ class IKBridge:
         if self.mirror_x:
             wrist_x = 1.0 - wrist_x
 
-        palm_dx = pts[MIDDLE_MCP][0] - pts[WRIST][0]
-        palm_dy = pts[MIDDLE_MCP][1] - pts[WRIST][1]
-        palm_scale = math.hypot(palm_dx, palm_dy)
-
-        pinch_dist = math.hypot(
-            pts[THUMB_TIP][0] - pts[INDEX_TIP][0], pts[THUMB_TIP][1] - pts[INDEX_TIP][1]
-        )
-        pinch_ratio = pinch_dist / palm_scale if palm_scale > 1e-6 else 1.0
-        mode = self._update_mode(pinch_ratio)
+        mode = self._update_mode(self._pinch_ratio(pts))
 
         prev_pose = self._last_action.arm_target_pose or Pose(
             position=(WORKSPACE_X_MIN, 0.0, WORKSPACE_Z_MIN)
@@ -217,12 +287,19 @@ class IKBridge:
         # Open hand: steer the base, and hold the arm where the operator left
         # it so it doesn't drift while driving.
         dx = wrist_x - 0.5
-        dy = wrist_y - 0.5
         dx = 0.0 if abs(dx) < BASE_DEADZONE else dx
-        dy = 0.0 if abs(dy) < BASE_DEADZONE else dy
-
-        target_vx = -dy * 2.0 * BASE_FORWARD_GAIN
         target_omega = -dx * 2.0 * BASE_TURN_GAIN
+
+        if self.drive_from_pitch:
+            pitch = self.hand_pitch(pts)
+            if abs(pitch) < PITCH_DEADZONE:
+                pitch = 0.0
+            # Curled forward (negative pitch) drives forward, hence the sign.
+            target_vx = -_clamp(pitch / PITCH_FULL_SCALE, -1.0, 1.0) * BASE_FORWARD_GAIN
+        else:
+            dy = wrist_y - 0.5
+            dy = 0.0 if abs(dy) < BASE_DEADZONE else dy
+            target_vx = -dy * 2.0 * BASE_FORWARD_GAIN
 
         prev_vx, _prev_vy, prev_omega = self._last_action.base_velocity
         smoothed_vx = _lerp(prev_vx, target_vx, self.ema_alpha)

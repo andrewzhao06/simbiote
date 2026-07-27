@@ -22,6 +22,7 @@ from simbiote.robot_iface.actions import GripperState, RobotAction
 from simbiote.teleop.hand_tracking import HAND_CONNECTIONS, HandLandmarks, WRIST
 from simbiote.teleop.ik_bridge import (
     BASE_DEADZONE,
+    hand_pitch,
     WORKSPACE_X_MAX,
     WORKSPACE_X_MIN,
     WORKSPACE_Y_MAX,
@@ -222,6 +223,12 @@ def render_panel(
         y = _bar(panel, y, "arm x (reach)", px, WORKSPACE_X_MIN, WORKSPACE_X_MAX, " m")
         y = _bar(panel, y, "arm y (left/right)", py, WORKSPACE_Y_MIN, WORKSPACE_Y_MAX, " m")
         y = _bar(panel, y, "arm z (height)", pz, WORKSPACE_Z_MIN, WORKSPACE_Z_MAX, " m")
+
+    # Show the raw pitch alongside the velocity it produces: if the robot won't
+    # reverse, this tells you instantly whether the gesture isn't registering
+    # or the mapping is at fault.
+    if landmarks is not None:
+        y = _bar(panel, y, "hand pitch (fwd/back)", hand_pitch(landmarks.points), -1.0, 1.0)
 
     vx, _vy, omega = action.base_velocity
     y = _bar(panel, y, "base vx", vx, -0.6, 0.6, " m/s")

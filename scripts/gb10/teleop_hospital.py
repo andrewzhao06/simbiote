@@ -81,7 +81,7 @@ from simbiote.sim_env.hospital_map import SPAWN  # noqa: E402
 from simbiote.sim_env.arm_lift import ArmLift  # noqa: E402
 from simbiote.sim_env.isaac_nav import CONTROL_HZ, PHYSICS_HZ, IsaacHospital  # noqa: E402
 from simbiote.teleop.ik_bridge import WORKSPACE_Z_MAX, WORKSPACE_Z_MIN  # noqa: E402
-from simbiote.teleop.action_bridge import ActionReceiver  # noqa: E402
+from simbiote.teleop.action_bridge import ActionReceiver, CommandReceiver  # noqa: E402
 
 
 def main() -> int:
@@ -107,7 +107,10 @@ def main() -> int:
     )
 
     receiver = ActionReceiver(host=args.host, port=args.port)
+    commands = CommandReceiver(host=args.host, port=args.port + 1)
     print(f"[isaac] listening for teleop on udp://{args.host}:{args.port}")
+    print(f"[isaac] listening for commands on udp://{args.host}:{args.port + 1}")
+    print(f"[isaac] known locations: {', '.join(sorted(hospital.locations))}")
     print("[isaac] start the teleop process now; Ctrl+C here to stop.\n")
 
     dt = 1.0 / CONTROL_HZ
@@ -129,6 +132,26 @@ def main() -> int:
 
     try:
         while True:
+            for message in commands.poll():
+                if message["command"] == "goto":
+                    where = message.get("location", "")
+                    if where not in hospital.locations:
+                        print(f"[isaac] unknown location {where!r}; "
+                              f"known: {', '.join(sorted(hospital.locations))}")
+                        continue
+                    print(f"[isaac] AUTONOMY: navigating to {where} "
+                          f"{hospital.locations[where]} -- hand control paused")
+                    result = hospital.navigate_to(where)
+                    print(f"[isaac] AUTONOMY: {'reached' if result.success else 'FAILED'} "
+                          f"{where} ({result.reason}) in {result.duration_s:.1f}s")
+                    # Hand frames piled up while navigate_to blocked; drop them
+                    # so control resumes on the operator's *current* pose
+                    # rather than replaying a stale one.
+                    receiver.latest()
+                    hospital._reset_drive_target()
+                elif message["command"] == "stop":
+                    print("[isaac] AUTONOMY: stop")
+
             action = receiver.latest()
 
             if action is None:
@@ -201,6 +224,7 @@ def main() -> int:
         print("\n[isaac] interrupted")
     finally:
         receiver.close()
+        commands.close()
         hospital.close()
 
     return 0

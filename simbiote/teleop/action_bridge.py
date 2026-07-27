@@ -106,6 +106,57 @@ class UdpActionSink:
             self._socket = None
 
 
+DEFAULT_COMMAND_PORT = DEFAULT_PORT + 1
+
+
+def send_command(name: str, host: str = DEFAULT_HOST,
+                 port: int = DEFAULT_COMMAND_PORT, **fields) -> None:
+    """Fire a one-shot control command at the simulator.
+
+    Separate from the action stream on purpose. Actions are a continuous flow
+    of states where only the newest matters; a command is a discrete event that
+    must not be superseded by the next hand frame arriving 70 ms later. Sharing
+    the socket would mean the receiver's "keep only the latest" drain could
+    swallow it.
+    """
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.sendto(json.dumps({"command": name, **fields}).encode("utf-8"), (host, port))
+    finally:
+        sock.close()
+
+
+class CommandReceiver:
+    """Simulator-side endpoint for discrete commands. Never blocks."""
+
+    def __init__(self, host: str = "0.0.0.0", port: int = DEFAULT_COMMAND_PORT):
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._socket.bind((host, port))
+        self._socket.setblocking(False)
+
+    def poll(self) -> list[dict]:
+        """Return every command queued since the last call, in arrival order."""
+
+        commands = []
+        while True:
+            try:
+                payload, _addr = self._socket.recvfrom(65535)
+            except (BlockingIOError, OSError):
+                break
+            try:
+                message = json.loads(payload.decode("utf-8"))
+            except ValueError:
+                continue
+            if isinstance(message, dict) and "command" in message:
+                commands.append(message)
+        return commands
+
+    def close(self) -> None:
+        self._socket.close()
+
+
 class ActionReceiver:
     """Simulator-side endpoint: hands back the newest action received.
 
