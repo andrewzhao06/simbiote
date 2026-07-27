@@ -8,7 +8,7 @@ the `RobotAction` it produces.
 ## Run it
 
 ```bash
-cd ~/simbiote-Gagan1_Suraj2_Sky3_Andrew4
+cd ~/simbiote
 scripts/gb10/run_teleop_hospital.sh http://<iphone-ip>:4747/video/640x480
 ```
 
@@ -24,7 +24,7 @@ To run them separately (useful when iterating — you avoid re-booting Isaac):
     scripts/gb10/teleop_hospital.py
 
 # terminal 2 -- camera, hand tracking, preview window
-./.venv/bin/python run_teleop_demo.py --sink udp \
+./.venv/bin/python scripts/teleop/run_demo.py --sink udp \
     --camera-url http://<iphone-ip>:4747/video/640x480
 ```
 

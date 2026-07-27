@@ -42,7 +42,7 @@ over the cable with no Wi-Fi involved:
 ./.venv/bin/python scripts/gb10/usbmux_tunnel.py --device-port 4747
 
 # then the camera URL is simply localhost
-./.venv/bin/python run_teleop_demo.py --sink udp \
+./.venv/bin/python scripts/teleop/run_demo.py --sink udp \
     --camera-url http://127.0.0.1:4747/video/640x480
 ```
 
@@ -104,8 +104,8 @@ resolutions are the single biggest teleop performance mistake available here.
 ### 4. Run teleop against it
 
 ```bash
-cd ~/simbiote-Gagan1_Suraj2_Sky3_Andrew4
-./.venv/bin/python run_teleop_demo.py \
+cd ~/simbiote
+./.venv/bin/python scripts/teleop/run_demo.py \
     --camera-url http://<iphone-ip>:4747/video/640x480 \
     --backend wilor --sink pybullet
 ```
@@ -114,7 +114,7 @@ Or set it once for the shell:
 
 ```bash
 export SIMBIOTE_CAMERA_URL=http://<iphone-ip>:4747/video/640x480
-./.venv/bin/python run_teleop_demo.py --sink pybullet
+./.venv/bin/python scripts/teleop/run_demo.py --sink pybullet
 ```
 
 Hold or mount the phone in **landscape**. DroidCam follows the device's
@@ -148,7 +148,7 @@ Then find the index and use it:
   "from simbiote.teleop.camera_source import list_camera_indices, list_video_devices; \
    print(list_video_devices(), list_camera_indices())"
 
-./.venv/bin/python run_teleop_demo.py --camera-index 0 --sink pybullet
+./.venv/bin/python scripts/teleop/run_demo.py --camera-index 0 --sink pybullet
 ```
 
 This buys lower latency and lets any other app use the phone as a webcam. It

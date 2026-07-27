@@ -26,18 +26,18 @@ usd = [
 ]
 
 [project.scripts]
-factoryflow-map = "factoryflow_mapper.cli:main"
+simbiote-map = "src.cli:main"
 simbiote-agentic = "simbiote.agentic.agentic_session:main"
 simbiote-teleop = "simbiote.teleop.teleop_session:main"
 
 [tool.setuptools.packages.find]
-where = [".", "src"]
-include = ["simbiote*", "factoryflow_mapper*"]
+where = ["."]
+include = ["simbiote*", "src*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
 pythonpath = [".", "src"]
-testpaths = ["Gagan/tests", "Suraj/tests", "Sky/tests", "Andrew/tests"]
+testpaths = ["tests"]
 markers = [
   "slow: longer-running tests (real PPO convergence, multi-episode rollouts) -- excluded by default via `-m \"not slow\"` in CI-speed runs",
 ]

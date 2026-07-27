@@ -97,7 +97,7 @@ STAND_IN_CONFIG = RobotConfig(
 # (§5.4 — `RidgebackFranka/ridgeback_franka.usd`, no custom authoring needed).
 #
 # Joint/link names below were verified against the articulation as actually
-# loaded on the GB10 (see Suraj/check_isaac_hospital.py): 12 DOF total, made up
+# loaded on the GB10 (see scripts/gb10/check_isaac_hospital.py): 12 DOF total, made up
 # of 3 dummy planar base joints + panda_joint1..7 + 2 fingers.
 #
 # `usd_path` is relative to Isaac Sim's asset root, not absolute: resolve it

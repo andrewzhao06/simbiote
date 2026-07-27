@@ -19,27 +19,29 @@
 #     auto_sim --minimal         # building shell only, every prop hidden
 #     auto_sim --full            # full quality, if you want the pretty one
 #
-# Anything else is forwarded to Andrew/hospital_demo.py, so:
+# Anything else is forwarded to scripts/gb10/agentic/hospital_demo.py, so:
 #     auto_sim --llm fake        # rule-based planner, no model server needed
 #     auto_sim --headless        # no window (see below)
 #     auto_sim "go to room one"  # run that first, then drop into the menu
 #
 # For a one-shot run with no menu, call the demo directly:
-#     Andrew/hospital_demo.py --gui "go to room one"
+#     scripts/gb10/agentic/hospital_demo.py --gui "go to room one"
 #
 # Edit the menu itself in CANNED_COMMANDS at the top of
-# Andrew/hospital_demo.py.
+# scripts/gb10/agentic/hospital_demo.py.
 
 set -euo pipefail
 
-REPO="${SIMBIOTE_REPO:-/home/dell/simbiote-Gagan1_Suraj2_Sky3_Andrew4}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="${SIMBIOTE_REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 ISAAC_PY="${ISAAC_PYTHON:-/home/dell/IsaacSim/_build/linux-aarch64/release/python.sh}"
 
 die() { printf 'auto_sim: %s\n' "$1" >&2; exit 1; }
 
 [ -d "$REPO" ] || die "repo not found at $REPO (override with SIMBIOTE_REPO=...)"
 [ -x "$ISAAC_PY" ] || die "Isaac Sim's python.sh not found at $ISAAC_PY (override with ISAAC_PYTHON=...)"
-[ -f "$REPO/Andrew/hospital_demo.py" ] || die "$REPO/Andrew/hospital_demo.py is missing"
+[ -f "$REPO/scripts/gb10/agentic/hospital_demo.py" ] || \
+    die "$REPO/scripts/gb10/agentic/hospital_demo.py is missing"
 
 # --headless is ours, not hospital_demo.py's: that script takes --gui and
 # defaults to headless. Translating here means the flag people reach for
@@ -78,6 +80,6 @@ echo "auto_sim: the window may sit blank for most of that. It is not stuck."
 echo "auto_sim: the menu appears once the hospital has loaded. Ctrl-C to abort."
 echo
 
-exec "$ISAAC_PY" Andrew/hospital_demo.py \
+exec "$ISAAC_PY" scripts/gb10/agentic/hospital_demo.py \
     "${gui_flag[@]}" "${quality_flag[@]}" --interactive \
     "${forwarded[@]+"${forwarded[@]}"}"

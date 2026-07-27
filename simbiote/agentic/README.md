@@ -26,7 +26,7 @@ entry point is also runnable as `python -m simbiote.agentic.agentic_session`.)
 
 Against a real model on the GB10, warm it first — see [Model profiles](#model-profiles).
 
-Tests: `pytest Andrew/tests -q` (or the whole suite from the repo root).
+Tests: `pytest tests/agentic -q` (or the whole suite from the repo root).
 
 ## The chain
 

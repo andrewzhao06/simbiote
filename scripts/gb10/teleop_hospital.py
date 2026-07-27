@@ -9,7 +9,7 @@ and WiLoR). See `simbiote/teleop/action_bridge.py` for why it's split.
         scripts/gb10/teleop_hospital.py
 
     # terminal 2 -- camera + hand tracking + the preview window
-    ./.venv/bin/python run_teleop_demo.py --sink udp \
+    ./.venv/bin/python scripts/teleop/run_demo.py --sink udp \
         --camera-url http://<iphone-ip>:4747/video/640x480
 
 Or use `scripts/gb10/run_teleop_hospital.sh`, which starts both.

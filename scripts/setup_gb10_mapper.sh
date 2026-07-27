@@ -51,7 +51,7 @@ PY
 
 ENV_FILE="$REPO_ROOT/config/mapper.gb10.env"
 cat > "$ENV_FILE" <<EOF
-# Source this before running factoryflow-map in production mode.
+# Source this before running simbiote-map in production mode.
 export FACTORYFLOW_MODE=production
 export DGRUT_ROOT="$AI_ROOT/repos/3dgrut"
 export SAM3_ROOT="$AI_ROOT/repos/sam3"
@@ -80,4 +80,4 @@ echo "  1. Copy the scan into '$AI_ROOT/captures/'."
 echo "  2. Confirm model paths; this setup uses the SSD's existing AI/models and AI/repos layout."
 echo "  3. Source '$ENV_FILE'."
 echo "  4. Run: '$REPO_ROOT/scripts/gb10/preflight_mapper.sh' '$AI_ROOT' '$REPO_ROOT'"
-echo "  5. Run: uv run factoryflow-map --config '$CONFIG' doctor"
+echo "  5. Run: uv run simbiote-map --config '$CONFIG' doctor"

@@ -1,5 +1,5 @@
 """Shared test fixtures for the whole suite -- lives at the repo root so it's
-visible to `Suraj/tests/`, `Sky/tests/`, and `Andrew/tests/` alike (pytest's
+visible to every domain under `tests/` (pytest's
 conftest.py scoping cascades down from the rootdir to every subdirectory).
 
 `pybullet` has no Windows wheels on PyPI (see README's "Known issues" /
@@ -7,8 +7,7 @@ requirements.txt) -- tests that need real physics use `require_pybullet` so
 the suite reports SKIPPED (not an error, not a silent pass) on machines
 where it isn't installed, and runs for real on Linux/macOS/the GB10.
 
-`scene` / `fake_llm` / `tools` / `stage` (Andrew's) are used across
-`Andrew/tests/*`.
+`scene` / `fake_llm` / `tools` / `stage` are used across `tests/agentic/*`.
 """
 
 from __future__ import annotations

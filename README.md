@@ -14,13 +14,14 @@ loop is offline by design.
 
 | Owner | Responsibility | Primary code |
 | --- | --- | --- |
-| Gagan | Stray Scanner capture → OpenUSD scene map | `src/factoryflow_mapper/` |
+| Gagan | Stray Scanner capture → OpenUSD scene map | `src/` |
 | Suraj | Simulation, robot interfaces, and policy training | `simbiote/sim_env/`, `simbiote/training/` |
 | Sky | Hand-tracking teleoperation | `simbiote/teleop/` |
 | Andrew | Scene querying and agentic robot control | `simbiote/agentic/` |
 
-Each owner folder (`Gagan/`, `Suraj/`, `Sky/`, `Andrew/`) contains that module's
-README and tests. Run the complete suite with `python -m pytest`.
+Supporting files are grouped by function: tests live under `tests/`, operational
+entry points under `scripts/`, and module notes under `docs/modules/`. Run the
+complete suite with `python -m pytest`.
 
 ---
 
@@ -28,7 +29,7 @@ README and tests. Run the complete suite with `python -m pytest`.
 
 ```
                          ┌──────────────────────────────────────────────┐
-   iPhone (LiDAR) ─────▶│ 1. SCAN      src/factoryflow_mapper/          │
+   iPhone (LiDAR) ─────▶│ 1. SCAN      src/                           │
    Stray Scanner         │    phone scan → OpenUSD scene + scene graph  │
                          └───────────────────────┬──────────────────────┘
                                                  ▼
@@ -61,7 +62,7 @@ were built in parallel and still snap together.
 
 ## The four modules
 
-### 1. Scan → Map — `src/factoryflow_mapper/`
+### 1. Scan → Map — `src/`
 
 Turns an **iPhone LiDAR scan** (a [Stray Scanner](https://apps.apple.com/app/stray-scanner/id1557051662)
 export: RGB video, LiDAR depth, confidence maps, IMU, and ARKit poses) into a
@@ -77,7 +78,7 @@ objects, plus a machine-readable **scene graph** JSON.
 - `usd.py` — writes the OpenUSD stage and runs `validate_map`, the coded
   handoff contract to Module 2 (meter scale, Y-up, collision API, a navigable
   floor, a graspable object with mass + grasp type).
-- `cli.py` — the `factoryflow-map` command (`doctor`, `ingest`, `run`, `validate`).
+- `cli.py` — the `simbiote-map` command (`doctor`, `ingest`, `run`, `validate`).
 
 Runs in three modes: **`proxy`** (no models, contract testing), **`preview`**
 (real but sparse LiDAR point cloud — works on a CPU laptop), and
@@ -100,7 +101,8 @@ Loads the scene, spawns the reference robot (a 4-wheel omnidirectional base + ar
 - `sim_env/isaac_nav.py`, `sim_env/hospital_map.py` — the Isaac tier: the trained
   nav policy driving `hospital.usd` at true scale, over an occupancy grid + A*.
   Measured **16/20 ordered location pairs at 0.96x path efficiency**, including a
-  75 m traversal. See [`Suraj/README.md`](Suraj/README.md).
+  75 m traversal. See
+  [`docs/modules/sim_training.md`](docs/modules/sim_training.md).
 - `training/` — a shared actor-critic network (`policy_net.py`) trained two
   ways that feed the *same* weights: behavioral cloning from demonstrations
   (`bc_pretrain.py`) and from-scratch PPO (`ppo.py`, `train_nav.py`,
@@ -237,7 +239,7 @@ Then validate:
 
 ```powershell
 $env:PYTHONPATH="$PWD\src"
-python -m factoryflow_mapper.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
+python -m src.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
 ```
 
 ### Metadata-only Stray Scanner export
@@ -248,7 +250,7 @@ reaches the mapper, but they cannot reconstruct or label a room: there are no RG
 frames or LiDAR depth. Validate one explicitly:
 
 ```bash
-factoryflow-map --config config/mapper.gb10.toml \
+simbiote-map --config config/mapper.gb10.toml \
   ingest /path/to/metadata-only-scan --allow-metadata-only
 ```
 
@@ -269,7 +271,7 @@ $env:PYTHONPATH="$PWD\src"
 $env:FACTORYFLOW_MODE="preview"
 $env:FACTORYFLOW_WORK_ROOT="$PWD\.local\work"
 
-python -m factoryflow_mapper.cli --config config/mapper.example.toml run `
+python -m src.cli --config config/mapper.example.toml run `
   --capture ".\UPLOAD_PHONE_SCANS_HERE\<scan-name>" `
   --out ".\.local\preview.usda"
 ```
@@ -325,7 +327,7 @@ installs the Python package with `uv`. Edit the generated config to match the
 actual downloaded directories, then:
 
 ```bash
-factoryflow-map --config config/mapper.gb10.toml doctor
+simbiote-map --config config/mapper.gb10.toml doctor
 ```
 
 `doctor` returns nonzero if a requirement for the selected mode is missing. The
@@ -387,7 +389,7 @@ interfaces rather than mock output:
    its exported USD/USDZ layer.
 4. `run_sam3.sh` uses local `sam3.pt` from the official `facebook/sam3`
    repository to turn fixed text prompts into the `detections.json` contract.
-   For **multi-frame** labeling use `Gagan/adapters/sam3_detect.py`;
+   For **multi-frame** labeling use `scripts/gb10/adapters/sam3_detect.py`;
    `scripts/gb10/sam3_labels.py` labels only the first video frame.
 
 Run the setup script, then source its generated environment:
@@ -425,11 +427,11 @@ for the reliable fallback demo.
 ### Production run and handoff
 
 ```bash
-factoryflow-map --config config/mapper.gb10.toml \
+simbiote-map --config config/mapper.gb10.toml \
   run --capture "$FACTORYFLOW_SSD_ROOT/captures/demo" \
   --out "$FACTORYFLOW_WORK_ROOT/demo.usda"
 
-factoryflow-map validate "$FACTORYFLOW_WORK_ROOT/demo.usda"
+simbiote-map validate "$FACTORYFLOW_WORK_ROOT/demo.usda"
 ```
 
 Successful output includes:
@@ -447,7 +449,7 @@ validation rejects proxy output.
 ## Repository layout
 
 ```text
-src/factoryflow_mapper/   # 1. scan → OpenUSD map
+src/   # 1. scan → OpenUSD map
 simbiote/                 # the platform package
 ├── sim_env/              #  2. PyBullet envs + the Isaac hospital tier
 ├── training/             #  2. PPO + behavioral cloning
@@ -458,17 +460,26 @@ simbiote/                 # the platform package
 ├── sim_stub/             #     toy PyBullet robot for teleop preview
 └── demo_logger.py        #     shared session logger (feeds retraining)
 
-scripts/                  # capture import
-scripts/gb10/             # GB10 production adapters + Isaac teleop
+scripts/                  # task-oriented utilities and entry points
+├── gb10/                 # GB10 adapters, Isaac tools, and agentic control
+├── teleop/               # teleoperation entry points
+└── training/             # demonstration and policy-training utilities
+tests/                    # tests grouped by platform domain
+├── mapper/               # scan-to-map pipeline
+├── sim_env/              # simulation environments
+├── training/             # policy training and export
+├── robot_iface/          # shared robot schemas
+├── teleop/               # hand-tracking control
+└── agentic/              # natural-language planning and execution
+artifacts/mapper/         # checked-in mapper output examples
 checkpoints/              # trained policies (nav_bc.pt is the one to use)
 config/                   # mapper config (example + generated GB10)
-docs/                     # master plan, downloads, SSD layout, teleop notes
+docs/                     # plans, operations guides, and module notes
 assets/                   # stand-in URDFs for laptop testing
 UPLOAD_PHONE_SCANS_HERE/  # phone scan drop zone
-{Andrew,Gagan,Sky,Suraj}/ # per-owner tests + module notes
 ```
 
-Console entry points (`pyproject.toml`): `factoryflow-map`, `simbiote-teleop`,
+Console entry points (`pyproject.toml`): `simbiote-map`, `simbiote-teleop`,
 `simbiote-agentic`.
 
 ---
@@ -480,7 +491,7 @@ Console entry points (`pyproject.toml`): `factoryflow-map`, `simbiote-teleop`,
   code runs fine, and physics tests skip rather than crash.
 - **On linux-aarch64** (the GB10), `pybullet`, `mediapipe`, and `usd-core` have
   no wheels. Teleop uses WiLoR, USD comes from Isaac Sim's bundled `pxr`, and a
-  locally-built pybullet wheel is used. See [`Gagan/README.md`](Gagan/README.md).
+  locally-built pybullet wheel is used. See [`docs/modules/mapper.md`](docs/modules/mapper.md).
 - **Isaac Sim / PhysX 5, Nemotron, WiLoR, cuMotion** are GB10-day swaps; the
   laptop build uses PyBullet, MediaPipe, and local/rule-based LLM backends.
 - Config defaults are Linux/GB10 paths; on a Windows dev box, pass a config file
@@ -497,7 +508,7 @@ Console entry points (`pyproject.toml`): `factoryflow-map`, `simbiote-teleop`,
 - [`docs/SSD_LAYOUT.md`](docs/SSD_LAYOUT.md) — external SSD layout.
 - [`docs/TELEOP_IPHONE_CAMERA.md`](docs/TELEOP_IPHONE_CAMERA.md) — phone-as-webcam on aarch64.
 - [`docs/TELEOP_ISAAC_HOSPITAL.md`](docs/TELEOP_ISAAC_HOSPITAL.md) — hand teleop into Isaac Sim.
-- `Gagan/SCAN_MAP.md` — scan-to-map design notes.
+- `docs/mapper/SCAN_MAP.md` — scan-to-map design notes.
 
 ---
 
@@ -515,7 +526,7 @@ uv run ruff check .
 
 | Module | Owner |
 | --- | --- |
-| Scan → Map (`src/factoryflow_mapper/`) | Gagan |
+| Scan → Map (`src/`) | Gagan |
 | Simulate & Train (`sim_env/`, `training/`, `robot/`) | Suraj |
 | Teleoperation (`teleop/`) | Sky |
 | Agentic Control (`agentic/`) | Andrew |

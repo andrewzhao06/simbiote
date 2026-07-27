@@ -222,7 +222,7 @@ cmake-build-*/
 # against Isaac Sim's bundled Python headers, see scripts/gb10/.
 .wheelhouse/
 # Dense reconstruction output (~64 MB): regenerable from the captures.
-Gagan/out/dense/
+artifacts/mapper/out/dense/
 scripts/gb10/harness/reports/.watch.lock
 
 # --- Misc ---

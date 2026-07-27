@@ -74,7 +74,7 @@ done
 echo "==> Isaac Sim is listening"
 
 echo "==> starting teleop (camera + hand tracking + preview window)"
-"$VENV_PY" run_teleop_demo.py \
+"$VENV_PY" scripts/teleop/run_demo.py \
     --sink udp --udp-port "$PORT" \
     --camera-url "$CAMERA_URL" \
     --backend wilor &
