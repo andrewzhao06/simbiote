@@ -39,14 +39,14 @@ over the cable with no Wi-Fi involved:
 
 ```bash
 # terminal 1 -- hold the tunnel open
-./.venv/bin/python scripts/gb10/usbmux_tunnel.py --device-port 4747
+./.venv/bin/python scripts/gb10/teleop/usbmux_tunnel.py --device-port 4747
 
 # then the camera URL is simply localhost
 ./.venv/bin/python scripts/teleop/run_demo.py --sink udp \
     --camera-url http://127.0.0.1:4747/video/640x480
 ```
 
-`scripts/gb10/usbmux_tunnel.py --list` shows tethered devices. The phone must
+`scripts/gb10/teleop/usbmux_tunnel.py --list` shows tethered devices. The phone must
 be plugged in, unlocked, and trusted; DroidCam must be running on it, but it
 does **not** need to be on any Wi-Fi network.
 

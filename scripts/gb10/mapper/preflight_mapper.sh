@@ -94,10 +94,10 @@ require_command uv
 require_file "3DGRUT Python" "$AI_ROOT/repos/3dgrut/.venv/bin/python"
 
 for script in run_colmap.sh run_depth.sh run_3dgrut.sh run_sam3.sh; do
-  if [[ -x "$REPO_ROOT/scripts/gb10/$script" ]]; then
+  if [[ -x "$REPO_ROOT/scripts/gb10/adapters/$script" ]]; then
     pass "Executable adapter: $script"
   else
-    fail "Adapter is not executable: $REPO_ROOT/scripts/gb10/$script"
+    fail "Adapter is not executable: $REPO_ROOT/scripts/gb10/adapters/$script"
   fi
 done
 

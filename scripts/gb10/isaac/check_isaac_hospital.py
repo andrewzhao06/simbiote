@@ -11,13 +11,12 @@ nav and grasp tasks will sit on:
 
 Run:
     /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-        scripts/gb10/check_isaac_hospital.py            # add --gui to watch
+        scripts/gb10/isaac/check_isaac_hospital.py            # add --gui to watch
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -138,7 +137,7 @@ for prim in stage.Traverse():
         value = attribute.Get()
         if not value:
             continue
-        if value.resolvedPath and os.path.exists(value.resolvedPath):
+        if value.resolvedPath and Path(value.resolvedPath).exists():
             resolved += 1
         else:
             unresolved.append(value.path)
@@ -227,7 +226,7 @@ base.initialize(simulation_context.physics_sim_view)
 def base_pose() -> tuple[np.ndarray, float]:
     """World position of base_link, and its tilt from the spawn orientation."""
     position, orientation = base.get_world_pose()
-    w, x, y, z = (float(v) for v in orientation)
+    _w, x, y, _z = (float(v) for v in orientation)
     # R[2][2] = cos(angle between the body Z axis and world +Z)
     upright = max(-1.0, min(1.0, 1 - 2 * (x * x + y * y)))
     return np.asarray([float(v) for v in position]), float(np.degrees(np.arccos(upright)))

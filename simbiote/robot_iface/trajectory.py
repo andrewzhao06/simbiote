@@ -24,9 +24,10 @@ Andrew's (agentic) actual demo-producing code needed to plug into it:
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Literal, Optional, Sequence
+from typing import Literal
 
 from simbiote.robot_iface.actions import RobotAction
 
@@ -40,9 +41,9 @@ class TrajectoryStep:
     timestamp: float
     action: RobotAction
     source: DemoSource
-    observation: List[float] = field(default_factory=list)
+    observation: list[float] = field(default_factory=list)
     reward: float = 0.0
-    skill: Optional[str] = None
+    skill: str | None = None
     ok: bool = True
 
     def to_dict(self) -> dict:
@@ -57,7 +58,7 @@ class TrajectoryStep:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "TrajectoryStep":
+    def from_dict(cls, d: dict) -> TrajectoryStep:
         return cls(
             timestamp=d["timestamp"],
             action=RobotAction.from_dict(d["action"]),
@@ -76,7 +77,7 @@ class Trajectory:
     session_id: str
     source: DemoSource
     task: str  # "nav" | "grasp" | "wheelchair"
-    steps: List[TrajectoryStep] = field(default_factory=list)
+    steps: list[TrajectoryStep] = field(default_factory=list)
 
     def __len__(self) -> int:
         return len(self.steps)
@@ -84,16 +85,16 @@ class Trajectory:
     def __iter__(self):
         return iter(self.steps)
 
-    def observations(self) -> List[List[float]]:
+    def observations(self) -> list[list[float]]:
         return [s.observation for s in self.steps]
 
-    def action_vectors(self) -> List[tuple]:
+    def action_vectors(self) -> list[tuple]:
         return [s.action.to_vector() for s in self.steps]
 
-    def skills(self) -> List[str]:
+    def skills(self) -> list[str]:
         """Skills in first-appearance order, for a quick sanity read of an
         agentic run (teleop steps have `skill=None` and are omitted)."""
-        seen: List[str] = []
+        seen: list[str] = []
         for s in self.steps:
             if s.skill and s.skill not in seen:
                 seen.append(s.skill)
@@ -108,7 +109,7 @@ class Trajectory:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Trajectory":
+    def from_dict(cls, d: dict) -> Trajectory:
         return cls(
             session_id=d["session_id"],
             source=d["source"],
@@ -122,7 +123,7 @@ class Trajectory:
         path.write_text(json.dumps(self.to_dict(), indent=2))
 
     @classmethod
-    def load(cls, path: str | Path) -> "Trajectory":
+    def load(cls, path: str | Path) -> Trajectory:
         return cls.from_dict(json.loads(Path(path).read_text()))
 
 
@@ -146,10 +147,12 @@ def make_toy_trajectory(
             base_velocity=(rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1)),
         )
         steps.append(
-            TrajectoryStep(timestamp=float(t), observation=obs, action=action, source=source, reward=0.0)
+            TrajectoryStep(
+                timestamp=float(t), observation=obs, action=action, source=source, reward=0.0
+            )
         )
     return Trajectory(session_id=session_id, source=source, task=task, steps=steps)
 
 
-def load_trajectories(paths: Sequence[str | Path]) -> List[Trajectory]:
+def load_trajectories(paths: Sequence[str | Path]) -> list[Trajectory]:
     return [Trajectory.load(p) for p in paths]

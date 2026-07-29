@@ -1,7 +1,12 @@
 import json
 
 from simbiote.robot_iface.actions import ACTION_VECTOR_DIM, GripperState, Pose, RobotAction
-from simbiote.robot_iface.trajectory import Trajectory, TrajectoryStep, load_trajectories, make_toy_trajectory
+from simbiote.robot_iface.trajectory import (
+    Trajectory,
+    TrajectoryStep,
+    load_trajectories,
+    make_toy_trajectory,
+)
 
 
 def test_pose_roundtrip():
@@ -62,7 +67,9 @@ def test_pose_from_dict_accepts_flat_xyzq_form():
 
 def test_trajectory_step_dict_roundtrip():
     action = RobotAction(base_velocity=(1, 0, 0), gripper_state=GripperState.CLOSED)
-    step = TrajectoryStep(timestamp=1.0, observation=[0.1, 0.2], action=action, source="teleop", reward=0.5)
+    step = TrajectoryStep(
+        timestamp=1.0, observation=[0.1, 0.2], action=action, source="teleop", reward=0.5
+    )
     restored = TrajectoryStep.from_dict(step.to_dict())
     assert restored.observation == step.observation
     assert restored.action.gripper_state == GripperState.CLOSED
@@ -72,7 +79,9 @@ def test_trajectory_step_dict_roundtrip():
 
 def test_trajectory_step_skill_and_ok_roundtrip():
     action = RobotAction(base_velocity=(0, 0, 0))
-    step = TrajectoryStep(timestamp=2.0, action=action, source="agentic", skill="navigate_to", ok=False)
+    step = TrajectoryStep(
+        timestamp=2.0, action=action, source="agentic", skill="navigate_to", ok=False
+    )
     restored = TrajectoryStep.from_dict(step.to_dict())
     assert restored.skill == "navigate_to"
     assert restored.ok is False

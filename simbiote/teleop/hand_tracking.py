@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
@@ -75,7 +74,7 @@ class HandTracker:
             min_tracking_confidence=min_tracking_confidence,
         )
 
-    def get_hand_landmarks(self, frame: np.ndarray) -> Optional[HandLandmarks]:
+    def get_hand_landmarks(self, frame: np.ndarray) -> HandLandmarks | None:
         """frame: a BGR image as read from camera_source.FrameSource.read().
 
         Returns None if no hand is detected in this frame.
@@ -103,7 +102,7 @@ class HandTracker:
     def close(self) -> None:
         self._hands.close()
 
-    def __enter__(self) -> "HandTracker":
+    def __enter__(self) -> HandTracker:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -118,9 +117,23 @@ BACKENDS = ("auto", "mediapipe", "wilor")
 
 
 def _mediapipe_available() -> bool:
+    """True only when the *legacy solutions* API this backend uses is present.
+
+    `import mediapipe` succeeding is not enough. mediapipe 1.0 dropped the
+    legacy solutions API entirely (only `mediapipe.tasks` ships), so a plain
+    module check reports the backend as usable and the session then dies on
+    `mp.solutions.hands` several steps later -- after the camera is already
+    open. Probe the module `mp.solutions` actually aliases; `requirements.txt`
+    pins `mediapipe<1` to match.
+    """
     import importlib.util
 
-    return importlib.util.find_spec("mediapipe") is not None
+    if importlib.util.find_spec("mediapipe") is None:
+        return False
+    try:
+        return importlib.util.find_spec("mediapipe.python.solutions.hands") is not None
+    except (ImportError, ValueError):  # pragma: no cover - broken install
+        return False
 
 
 def resolve_backend(backend: str = "auto") -> str:
@@ -152,9 +165,12 @@ def create_tracker(backend: str = "auto", **kwargs):
     if resolved == "mediapipe":
         if not _mediapipe_available():
             raise RuntimeError(
-                "hand-tracking backend 'mediapipe' was requested but mediapipe is not "
-                "installed. On linux-aarch64 (the GB10) upstream publishes no wheel at "
-                "all -- use backend='wilor' instead."
+                "hand-tracking backend 'mediapipe' was requested but a usable "
+                "mediapipe is not installed: it is either absent, or version 1.0+, "
+                "which removed the `mediapipe.solutions` API this backend uses. "
+                "Install `mediapipe>=0.10,<1` (see requirements.txt). On "
+                "linux-aarch64 (the GB10) upstream publishes no wheel at all -- "
+                "use backend='wilor' instead."
             )
         return HandTracker(**kwargs)
 
@@ -172,7 +188,7 @@ def create_tracker(backend: str = "auto", **kwargs):
 _default_tracker = None
 
 
-def get_hand_landmarks(frame: np.ndarray) -> Optional[HandLandmarks]:
+def get_hand_landmarks(frame: np.ndarray) -> HandLandmarks | None:
     global _default_tracker
     if _default_tracker is None:
         _default_tracker = create_tracker()

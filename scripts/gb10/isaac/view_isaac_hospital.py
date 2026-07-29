@@ -5,14 +5,13 @@ watch. Same asset resolution, same fixed-base anchor, same clear spawn point,
 so what you see is what the checks ran against.
 
     /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-        scripts/gb10/view_isaac_hospital.py            # --play to run physics
+        scripts/gb10/isaac/view_isaac_hospital.py            # --play to run physics
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -34,8 +33,8 @@ simulation_app = SimulationApp({"headless": False, "width": 1600, "height": 1000
 
 import carb  # noqa: E402
 import omni.usd  # noqa: E402
-from pxr import Gf, Usd, UsdGeom, UsdPhysics  # noqa: E402
 from isaacsim.storage.native import get_assets_root_path  # noqa: E402
+from pxr import Gf, Usd, UsdGeom, UsdPhysics  # noqa: E402
 
 ASSET_ROOT_SETTING = "/persistent/isaac/asset_root/default"
 settings = carb.settings.get_settings()
@@ -109,7 +108,7 @@ try:
     import omni.kit.viewport.utility as viewport_utils
 
     viewport_utils.get_active_viewport().camera_path = "/ViewerCamera"
-except Exception as exc:  # noqa: BLE001 - framing is a convenience
+except Exception as exc:
     print(f"  (could not bind the framing camera: {exc})")
 
 if args.play:

@@ -124,7 +124,7 @@ the arm track commands under PhysX 5.
 
 ```bash
 /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-    scripts/gb10/check_isaac_hospital.py          # --gui to watch
+    scripts/gb10/isaac/check_isaac_hospital.py          # --gui to watch
 ```
 
 Expect it to take several minutes: PhysX cooks collision meshes for the whole
@@ -134,7 +134,7 @@ To look at it rather than assert on it:
 
 ```bash
 /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-    scripts/gb10/view_isaac_hospital.py           # --play to run physics
+    scripts/gb10/isaac/view_isaac_hospital.py           # --play to run physics
 ```
 
 Same asset resolution, anchor and spawn point as the check, so what you see is
@@ -238,9 +238,9 @@ occupancy grid + A* that makes it possible.
 
 ```bash
 /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-    scripts/gb10/eval_hospital_nav.py --checkpoint checkpoints/nav_bc.pt   # --gui
+    scripts/gb10/isaac/eval_hospital_nav.py --checkpoint checkpoints/nav_bc.pt   # --gui
 /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-    scripts/gb10/eval_hospital_nav.py --controller pursuit   # reference, no policy
+    scripts/gb10/isaac/eval_hospital_nav.py --controller pursuit   # reference, no policy
 ```
 
 **Measured: 16/20 ordered location pairs, mean 0.96x path efficiency** (i.e.

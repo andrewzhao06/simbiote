@@ -136,7 +136,7 @@ re-asks a model that answered badly; this re-asks a server that was not there.
   wheelchair path until that lands.
 - **OpenClaw registration** of `parse_instruction` as a gateway tool (Part 1) —
   needs the orchestrator running on the GB10.
-- **The scene graph fixture** (`simbiote/fixtures/hospital_scene_graph.json`) is
+- **The scene graph fixture** (`simbiote/assets/scenes/hospital_scene_graph.json`) is
   still hand-written, standing in for Teammate 1's real `build_graph.py` export.
   `_parse()` in `scene_query.py` is the one function that changes when that
   lands.

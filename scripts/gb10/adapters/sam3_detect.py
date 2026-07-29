@@ -3,7 +3,7 @@
 Runs Meta's SAM 3 over posed RGB frames from a Stray Scanner capture, projects
 each mask into 3D with the capture's own LiDAR depth and ARKit poses, merges
 detections of the same object seen from several frames, and writes the
-`detections.json` that `src.stages.label_scene` consumes.
+`detections.json` that `simbiote.mapper.stages.label_scene` consumes.
 
 SAM 3 does detection and segmentation from a text phrase in one model, so the
 prompts below are the whole configuration -- no class list, no fine-tuning.
@@ -29,9 +29,9 @@ from pathlib import Path
 
 import numpy as np
 
-from src.config import MapperConfig
-from src.ingest import load_capture_bundle
-from src.stages import rgb_width, unproject_frame
+from simbiote.mapper.config import MapperConfig
+from simbiote.mapper.ingest import load_capture_bundle
+from simbiote.mapper.stages import rgb_width, unproject_frame
 
 # Hospital-flavoured defaults: things a mobile manipulator would be asked to
 # pick up, plus the surfaces they rest on. Override with --object-prompts.
@@ -166,7 +166,7 @@ def usable_frame_count(video: Path, timestamps: np.ndarray) -> int:
     # next (40 such blips in d6724d7d8d, all self-correcting). Comparing the
     # median of the window behind each frame with the window ahead of it keeps
     # the original guard's intent while ignoring blips that heal.
-    window = max(5, int(round(0.5 / interval)))  # ~half a second of frames
+    window = max(5, round(0.5 / interval))  # ~half a second of frames
     if count > 2 * window:
         windows = np.lib.stride_tricks.sliding_window_view(residual, window)
         medians = np.median(windows, axis=1)          # medians[i] covers [i, i+window)
@@ -236,7 +236,7 @@ def load_geometry_points(geometry: Path | None) -> np.ndarray | None:
                 raw = points.GetPointsAttr().Get()
                 if raw:
                     return np.asarray([tuple(p) for p in raw], dtype=np.float64)
-    except Exception as exc:  # noqa: BLE001 - advisory input, never fatal
+    except Exception as exc:
         print(f"[sam3] note: could not read {geometry}: {exc}")
     return None
 
@@ -282,7 +282,7 @@ def main() -> int:
         capture.video_path,
         np.array([frame.timestamp for frame in capture.frames]),
     )
-    paired = [frame for frame in capture.frames[:usable]]
+    paired = list(capture.frames[:usable])
 
     # Sample evenly across the sweep so objects are seen from several angles.
     count = min(args.frames, len(paired))
@@ -297,9 +297,9 @@ def main() -> int:
     if args.sam3_root:
         sys.path.insert(0, str(args.sam3_root))
     import torch
-    from sam3.model_builder import build_sam3_image_model
-    from sam3.model.sam3_image_processor import Sam3Processor
     from PIL import Image
+    from sam3.model.sam3_image_processor import Sam3Processor
+    from sam3.model_builder import build_sam3_image_model
 
     checkpoint = args.checkpoint
     if checkpoint.is_dir():
@@ -339,7 +339,7 @@ def main() -> int:
                         state["scores"].float().cpu().numpy(),
                     ))
             for prompt, kind, masks, scores in per_prompt:
-                for mask, score in zip(masks, scores):
+                for mask, score in zip(masks, scores, strict=True):
                     if score < args.min_score:
                         continue
                     mask = mask > 0.5

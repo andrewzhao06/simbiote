@@ -58,7 +58,7 @@ CATEGORY_ORDER = [
 MOVEMENT = {"REGRESSION", "NEW FAIL", "NEW PASS", "REMOVED", "NEW CHECK"}
 
 
-def die(msg: str, code: int = 2) -> "None":
+def die(msg: str, code: int = 2) -> None:
     print(f"trend: {msg}", file=sys.stderr)
     sys.exit(code)
 
@@ -121,7 +121,7 @@ def index(report: dict) -> dict:
     return out
 
 
-def classify(prev: "str|None", cur: "str|None") -> str:
+def classify(prev: str|None, cur: str|None) -> str:
     if prev is None:
         return "NEW PASS" if cur in PASSING else "NEW CHECK"
     if cur is None:
@@ -227,8 +227,12 @@ def render(cur_path, prev_path, cur_report, prev_report, rows, counts, quiet):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="classify movement between two harness reports")
-    ap.add_argument("--current", help="report JSON to treat as current (default reports/latest.json)")
-    ap.add_argument("--previous", help="report JSON to compare against (default: the one before current)")
+    ap.add_argument(
+        "--current", help="report JSON to treat as current (default reports/latest.json)"
+    )
+    ap.add_argument(
+        "--previous", help="report JSON to compare against (default: the one before current)"
+    )
     ap.add_argument("--reports-dir", help=f"reports directory (default {REPORTS_DIR})")
     ap.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     ap.add_argument("--quiet", action="store_true", help="only print checks that moved")

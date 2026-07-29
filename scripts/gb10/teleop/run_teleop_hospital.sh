@@ -6,14 +6,14 @@
 #   2. teleop     (the repo .venv)         -- camera, WiLoR, and the webcam window
 #
 # Usage:
-#   scripts/gb10/run_teleop_hospital.sh http://172.16.11.185:4747/video/640x480
-#   scripts/gb10/run_teleop_hospital.sh                 # uses $SIMBIOTE_CAMERA_URL
+#   scripts/gb10/teleop/run_teleop_hospital.sh http://172.16.11.185:4747/video/640x480
+#   scripts/gb10/teleop/run_teleop_hospital.sh                 # uses $SIMBIOTE_CAMERA_URL
 #
 # Ctrl+C stops both.
 
 set -uo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$REPO"
 
 ISAAC_PY="/home/dell/IsaacSim/_build/linux-aarch64/release/python.sh"
@@ -55,7 +55,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "==> starting Isaac Sim (hospital + Ridgeback/Franka). First boot takes a few minutes."
-"$ISAAC_PY" scripts/gb10/teleop_hospital.py --port "$PORT" "${@:2}" &
+"$ISAAC_PY" scripts/gb10/teleop/teleop_hospital.py --port "$PORT" "${@:2}" &
 ISAAC_PID=$!
 
 # Isaac has to be bound before teleop starts firing, or the first datagrams are

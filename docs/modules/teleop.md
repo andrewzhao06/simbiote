@@ -23,7 +23,7 @@ The implementation lives in `simbiote/teleop/` and `simbiote/sim_stub/`. Tests l
 ## Driving the hospital robot in Isaac Sim
 
 ```bash
-scripts/gb10/run_teleop_hospital.sh http://<iphone-ip>:4747/video/640x480
+scripts/gb10/teleop/run_teleop_hospital.sh http://<iphone-ip>:4747/video/640x480
 ```
 
 Opens Isaac Sim with `hospital.usd` + the Ridgeback/Franka and the webcam
@@ -59,11 +59,12 @@ the upstream artifact does not exist for `linux-aarch64`:
   `docs/TELEOP_IPHONE_CAMERA.md`.
 
 WiLoR needs a chumpy-free MANO pickle, because chumpy doesn't import on
-Python 3.12. It's already generated at `assets/mano/MANO_RIGHT.pkl`; to
+Python 3.12. It's already generated at `simbiote/assets/mano/MANO_RIGHT.pkl`; to
 rebuild it:
 
 ```bash
-./.venv/bin/python scripts/gb10/dechumpify_mano.py --out assets/mano/MANO_RIGHT.pkl
+./.venv/bin/python scripts/gb10/teleop/dechumpify_mano.py \
+    --out simbiote/assets/mano/MANO_RIGHT.pkl
 ```
 
 Note the teleop chain runs under the repo `.venv`, not Isaac Sim's bundled

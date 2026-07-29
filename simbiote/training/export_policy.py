@@ -4,7 +4,8 @@
     ONNX/TorchScript checkpoints, callable via navigate_to(location_id) /
     pick_up(object_id)"
 
-    python -m simbiote.training.export_policy --checkpoint checkpoints/nav_ppo.pt --format onnx --out checkpoints/nav_policy.onnx
+    python -m simbiote.training.export_policy --checkpoint checkpoints/nav_ppo.pt \
+        --format onnx --out checkpoints/nav_policy.onnx
 
 Exports a deterministic, obs -> action_mean inference graph only (no
 sampling, no value head) -- exactly what `robot_iface/skills.py` and Steps
@@ -31,8 +32,16 @@ class InferenceOnlyPolicy(nn.Module):
         self.actor_mean = policy.actor_mean
         low = policy.meta.act_low
         high = policy.meta.act_high
-        self.register_buffer("act_low", torch.as_tensor(low, dtype=torch.float32) if low is not None else None, persistent=False)
-        self.register_buffer("act_high", torch.as_tensor(high, dtype=torch.float32) if high is not None else None, persistent=False)
+        self.register_buffer(
+            "act_low",
+            torch.as_tensor(low, dtype=torch.float32) if low is not None else None,
+            persistent=False,
+        )
+        self.register_buffer(
+            "act_high",
+            torch.as_tensor(high, dtype=torch.float32) if high is not None else None,
+            persistent=False,
+        )
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         action = self.actor_mean(obs)
@@ -71,7 +80,9 @@ def export_policy(checkpoint: str | Path, out_path: str | Path, fmt: str = "onnx
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Export a checkpoint to ONNX/TorchScript for Steps 3 & 4.")
+    parser = argparse.ArgumentParser(
+        description="Export a checkpoint to ONNX/TorchScript for Steps 3 & 4."
+    )
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--format", type=str, default="onnx", choices=["onnx", "torchscript"])
     parser.add_argument("--out", type=str, required=True)

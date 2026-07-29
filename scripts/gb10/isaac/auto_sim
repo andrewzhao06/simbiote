@@ -33,7 +33,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="${SIMBIOTE_REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+REPO="${SIMBIOTE_REPO:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 ISAAC_PY="${ISAAC_PYTHON:-/home/dell/IsaacSim/_build/linux-aarch64/release/python.sh}"
 
 die() { printf 'auto_sim: %s\n' "$1" >&2; exit 1; }

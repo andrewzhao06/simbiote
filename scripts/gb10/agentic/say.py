@@ -16,9 +16,17 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+# These scripts are run by path (often under Isaac Sim's bundled interpreter,
+# where the package isn't installed), so put the repo on sys.path. Located by
+# walking up to pyproject.toml rather than by a fixed parent count, which
+# silently breaks the moment the file moves between script subdirectories.
+REPO_ROOT = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file()
+)
+sys.path.insert(0, str(REPO_ROOT))
 
-from simbiote.agentic.control_queue import DEFAULT_ROOT, ControlQueue  # noqa: E402
+from simbiote.agentic.control_queue import ControlQueue, default_control_root  # noqa: E402
 
 parser = argparse.ArgumentParser()
 parser.add_argument("instructions", nargs="*")
@@ -28,7 +36,7 @@ parser.add_argument("--json", action="store_true", help="print the raw result")
 parser.add_argument("--control-root", default=None)
 args = parser.parse_args()
 
-queue = ControlQueue(Path(args.control_root) if args.control_root else DEFAULT_ROOT)
+queue = ControlQueue(Path(args.control_root) if args.control_root else default_control_root())
 status = queue.status()
 
 if args.status or not args.instructions:

@@ -12,9 +12,9 @@ the chumpy types, unwrap each stub to its plain numpy array, and write the
 result back out. The rewritten file is a drop-in for the original.
 
 Usage:
-    python scripts/gb10/dechumpify_mano.py \
+    python scripts/gb10/teleop/dechumpify_mano.py \
         --src /home/dell/AI/models/wilor/mano_data/mano/MANO_RIGHT.pkl \
-        --out <repo>/assets/mano/MANO_RIGHT.pkl
+        --out <repo>/simbiote/assets/mano/MANO_RIGHT.pkl
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ def _unwrap(obj):
 
 
 def dechumpify(src: Path, out: Path) -> dict:
-    with open(src, "rb") as fh:
+    with src.open("rb") as fh:
         data = _ChumpyUnpickler(fh, encoding="latin1").load()
 
     clean = _unwrap(data)
@@ -117,7 +117,7 @@ def dechumpify(src: Path, out: Path) -> dict:
         clean[key] = np.asarray(value)
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "wb") as fh:
+    with out.open("wb") as fh:
         pickle.dump(clean, fh, protocol=4)
     return clean
 

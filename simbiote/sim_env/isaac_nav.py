@@ -40,16 +40,16 @@ in world terms depends on how the robot prim composed.
 
 from __future__ import annotations
 
+import contextlib
 import math
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from simbiote.sim_env.hospital_map import (
-    DEFAULT_HOSPITAL_USD,
     HOSPITAL_LOCATIONS,
     SPAWN,
     HospitalMap,
@@ -81,7 +81,7 @@ class MainThreadBridge:
         import queue as _queue
         import threading
 
-        self._queue: "_queue.Queue" = _queue.Queue()
+        self._queue: _queue.Queue = _queue.Queue()
         self._threading = threading
 
     def call(self, function: Callable[[], object]) -> object:
@@ -89,7 +89,7 @@ class MainThreadBridge:
         if threading.current_thread() is threading.main_thread():
             return function()
 
-        box: Dict[str, object] = {}
+        box: dict[str, object] = {}
         done = threading.Event()
         self._queue.put((function, box, done))
         done.wait()
@@ -107,7 +107,7 @@ class MainThreadBridge:
             return False
         try:
             box["value"] = function()
-        except BaseException as error:  # noqa: BLE001 - relayed to the caller
+        except BaseException as error:
             box["error"] = error
         finally:
             done.set()
@@ -204,8 +204,8 @@ class NavTuning:
 class NavResult:
     success: bool
     location_id: str
-    goal_xy: Tuple[float, float]
-    final_xy: Tuple[float, float]
+    goal_xy: tuple[float, float]
+    final_xy: tuple[float, float]
     goal_distance: float
     path_length: float
     travelled: float
@@ -215,7 +215,7 @@ class NavResult:
     reason: str = ""
     collided: bool = False
     min_clearance: float = float("inf")
-    trace: List[Tuple[float, float]] = field(default_factory=list)
+    trace: list[tuple[float, float]] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -269,10 +269,10 @@ class IsaacHospital:
         self,
         headless: bool = True,
         checkpoint: str | Path = CHECKPOINT_DIR / "nav_bc.pt",
-        spawn: Tuple[float, float] = SPAWN,
-        locations: Optional[Dict[str, Tuple[float, float]]] = None,
-        tuning: Optional[NavTuning] = None,
-        assets_root: Optional[str] = None,
+        spawn: tuple[float, float] = SPAWN,
+        locations: dict[str, tuple[float, float]] | None = None,
+        tuning: NavTuning | None = None,
+        assets_root: str | None = None,
         controller: str = "policy",
         renders_per_control: int = 0,
         width: int = 1600,
@@ -309,7 +309,7 @@ class IsaacHospital:
 
         self.infer = load_policy(checkpoint) if controller == "policy" else None
         self.checkpoint = str(checkpoint)
-        self.map: Optional[HospitalMap] = None
+        self.map: HospitalMap | None = None
 
         self._boot(headless=headless, assets_root=assets_root)
         # After _boot: building the grid needs `pxr`, and under Isaac Sim's own
@@ -321,7 +321,7 @@ class IsaacHospital:
 
     # -- bring-up -----------------------------------------------------------
 
-    def _boot(self, headless: bool, assets_root: Optional[str]) -> None:
+    def _boot(self, headless: bool, assets_root: str | None) -> None:
         from isaacsim import SimulationApp
 
         self._app = SimulationApp(
@@ -482,7 +482,7 @@ class IsaacHospital:
 
         # One marker per named destination, so the route reads as going
         # somewhere rather than wandering.
-        for index, (name, (x, y)) in enumerate(sorted(self.locations.items())):
+        for index, (_name, (x, y)) in enumerate(sorted(self.locations.items())):
             marker = UsdGeom.Cube.Define(stage, Sdf.Path(f"/World/Marker_{index}"))
             marker.CreateSizeAttr(1.0)
             marker_xform = UsdGeom.Xformable(marker)
@@ -491,7 +491,7 @@ class IsaacHospital:
             marker.CreateDisplayColorAttr([Gf.Vec3f(0.15, 0.55, 0.85)])
         self._marker_count = len(self.locations)
 
-    def show_route(self, path: Sequence[Tuple[float, float]]) -> None:
+    def show_route(self, path: Sequence[tuple[float, float]]) -> None:
         """Draw the planned route as a strip of pucks (flat mode only)."""
         if not self._flat or not path:
             return
@@ -503,7 +503,7 @@ class IsaacHospital:
 
         # Sample along the path rather than one puck per waypoint, so long
         # straight segments still read as a line.
-        points: List[Tuple[float, float]] = []
+        points: list[tuple[float, float]] = []
         for index in range(1, len(path)):
             start, end = path[index - 1], path[index]
             span = math.dist(start, end)
@@ -547,7 +547,7 @@ class IsaacHospital:
         hidden = 0
         for prim in stage.Traverse():
             name = prim.GetName()
-            drop = name.startswith("Geo_Roof") or "Ceiling" in name or name.startswith("Light_test")
+            drop = name.startswith(("Geo_Roof", "Light_test")) or "Ceiling" in name
             if minimal and not drop and name.startswith("Geo_"):
                 # A prop is anything that is not part of the shell.
                 drop = not any(token in name for token in keep)
@@ -577,7 +577,7 @@ class IsaacHospital:
         arm = [n for n in names if n.startswith("panda_joint")]
         folded = np.array([0.0, -1.6, 0.0, -2.8, 0.0, 1.6, 0.785])
         targets = self.robot.get_joint_positions().copy()
-        for name, value in zip(arm, folded):
+        for name, value in zip(arm, folded, strict=True):
             targets[self.robot.get_dof_index(name)] = value
         self.robot.apply_action(ArticulationAction(joint_positions=targets))
         self._settle(180)
@@ -622,7 +622,7 @@ class IsaacHospital:
 
     # -- state --------------------------------------------------------------
 
-    def base_xy(self) -> Tuple[float, float]:
+    def base_xy(self) -> tuple[float, float]:
         # PhysX writes simulated poses to Fabric; the authored xformOp still
         # reads the spawn pose, so this must come from the rigid prim.
         position, _ = self.base.get_world_pose()
@@ -633,14 +633,16 @@ class IsaacHospital:
         w, x, y, z = (float(v) for v in orientation)
         return math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
 
-    def base_velocity(self) -> Tuple[float, float, float]:
+    def base_velocity(self) -> tuple[float, float, float]:
         linear = self.base.get_linear_velocity()
         angular = self.base.get_angular_velocity()
         return (float(linear[0]), float(linear[1]), float(angular[2]))
 
     # -- observation --------------------------------------------------------
 
-    def _nearest_obstacles(self, x: float, y: float, count: int = 3) -> List[Tuple[float, float, float]]:
+    def _nearest_obstacles(
+        self, x: float, y: float, count: int = 3
+    ) -> list[tuple[float, float, float]]:
         """`count` nearest occupied cells as (dx, dy, distance), robot-relative.
 
         Matches `NavEnv._get_obs()`'s encoding: world-frame offsets, sorted
@@ -662,7 +664,7 @@ class IsaacHospital:
         dx, dy = wx - x, wy - y
         distance = np.hypot(dx, dy)
         order = np.argsort(distance)[: count * 40]
-        out: List[Tuple[float, float, float]] = []
+        out: list[tuple[float, float, float]] = []
         # Nearest cells cluster on one wall face; spread the three slots over
         # distinct obstacles so the policy sees the corridor, not one point.
         for index in order:
@@ -673,7 +675,7 @@ class IsaacHospital:
                 break
         return out
 
-    def _observation(self, goal: Tuple[float, float]) -> np.ndarray:
+    def _observation(self, goal: tuple[float, float]) -> np.ndarray:
         x, y = self.base_xy()
         yaw = self.base_yaw()
         vx, vy, omega = self.base_velocity()
@@ -686,7 +688,7 @@ class IsaacHospital:
             gdx, gdy = gdx * limit / distance, gdy * limit / distance
             distance = limit
 
-        features: List[float] = []
+        features: list[float] = []
         for odx, ody, od in self._nearest_obstacles(x, y):
             features.extend([odx, ody, od])
         while len(features) < 9:
@@ -696,8 +698,7 @@ class IsaacHospital:
         # so passing the hospital's absolute coordinates here would be the
         # single largest distribution shift in the observation.
         return np.array(
-            [0.0, 0.0, math.cos(yaw), math.sin(yaw), gdx, gdy, distance, vx, vy, omega]
-            + features,
+            [0.0, 0.0, math.cos(yaw), math.sin(yaw), gdx, gdy, distance, vx, vy, omega, *features],
             dtype=np.float32,
         )
 
@@ -722,7 +723,7 @@ class IsaacHospital:
             import omni.kit.viewport.utility as viewport_utils
 
             viewport_utils.get_active_viewport().camera_path = "/ChaseCamera"
-        except Exception as exc:  # noqa: BLE001 - framing is a convenience
+        except Exception as exc:
             print(f"  (could not bind the chase camera: {exc})")
 
     def _aim_camera(self) -> None:
@@ -812,11 +813,15 @@ class IsaacHospital:
                 np.clip(self._target[dof], actual[dof] - lead, actual[dof] + lead)
             )
         self._target[self.dof_yaw] = float(
-            np.clip(self._target[self.dof_yaw], actual[self.dof_yaw] - 0.5, actual[self.dof_yaw] + 0.5)
+            np.clip(
+                self._target[self.dof_yaw], actual[self.dof_yaw] - 0.5, actual[self.dof_yaw] + 0.5
+            )
         )
         self.robot.apply_action(ArticulationAction(joint_positions=self._target))
 
-    def _carrot(self, path: Sequence[Tuple[float, float]], index: int, xy: Tuple[float, float]) -> Tuple[Tuple[float, float], int]:
+    def _carrot(
+        self, path: Sequence[tuple[float, float]], index: int, xy: tuple[float, float]
+    ) -> tuple[tuple[float, float], int]:
         """Advance along `path` and return the point to steer at.
 
         Pure-pursuit style: skip waypoints already within `waypoint_threshold`,
@@ -847,8 +852,8 @@ class IsaacHospital:
         return point, index
 
     def _cross_track(
-        self, path: Sequence[Tuple[float, float]], index: int, xy: Tuple[float, float]
-    ) -> Tuple[float, float]:
+        self, path: Sequence[tuple[float, float]], index: int, xy: tuple[float, float]
+    ) -> tuple[float, float]:
         """Velocity correction pulling the base back onto the planned segment.
 
         Returns a world-frame (vx, vy) perpendicular to the active segment,
@@ -878,7 +883,7 @@ class IsaacHospital:
     def navigate_to(
         self,
         location_id: str,
-        goal_xy: Optional[Tuple[float, float]] = None,
+        goal_xy: tuple[float, float] | None = None,
         trace: bool = False,
     ) -> NavResult:
         """Drive to a named scene-graph location through the real building."""
@@ -914,8 +919,8 @@ class IsaacHospital:
         travelled = 0.0
         previous = start_xy
         min_clearance = float("inf")
-        history: List[Tuple[float, float]] = [start_xy]
-        recent: List[Tuple[float, float]] = []
+        history: list[tuple[float, float]] = [start_xy]
+        recent: list[tuple[float, float]] = []
         reason = "timeout"
         success = False
 
@@ -1009,7 +1014,7 @@ class IsaacHospital:
             trace=history if trace else [],
         )
 
-    def teleport(self, xy: Tuple[float, float]) -> None:
+    def teleport(self, xy: tuple[float, float]) -> None:
         """Reset the base to a pose without simulating the drive there.
 
         Used to set up an evaluation run from a chosen start; not a skill.
@@ -1052,8 +1057,6 @@ class IsaacHospital:
         return bool(self._app.is_running())
 
     def close(self) -> None:
-        try:
+        with contextlib.suppress(Exception):  # shutting down regardless
             self.sim.stop()
-        except Exception:  # noqa: BLE001 - shutting down regardless
-            pass
         self._app.close()

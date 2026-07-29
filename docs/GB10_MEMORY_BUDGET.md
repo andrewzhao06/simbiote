@@ -56,7 +56,7 @@ Budget rule from the master plan: **hard ceiling ~105 GB, keep ≥20 GB headroom
 4. **Isaac Sim Full logs at Info level by default** — the 18:29 run wrote 26 MB of
    per-frame render spam in 12 minutes. Not the crash cause, but don't leave it running.
 
-`scripts/gb10/validate_usd_isaac.sh` enforces rules 1–3 automatically: it refuses to
+`scripts/gb10/mapper/validate_usd_isaac.sh` enforces rules 1–3 automatically: it refuses to
 start if less than 25 GB is available or if a container matching `vllm` is running
 (override with `ALLOW_RESIDENT_LLM=1`).
 
@@ -69,7 +69,7 @@ cannot fault GPU allocations out to swap, which is why `NV_ERR_NO_MEMORY` fired 
 ## Validating a mapper scene
 
 ```bash
-scripts/gb10/validate_usd_isaac.sh /home/dell/factoryflow/stage/proxy-demo.usda \
+scripts/gb10/mapper/validate_usd_isaac.sh /home/dell/factoryflow/stage/proxy-demo.usda \
     --json /home/dell/factoryflow/stage/proxy-demo.isaac_validation.json
 ```
 

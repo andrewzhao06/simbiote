@@ -155,7 +155,6 @@ colmap/
 *.avi
 *.mkv
 *.webm
-!**/fixtures/**/*.mp4
 !**/testdata/**/*.mp4
 
 # Point clouds / meshes / Gaussians
@@ -189,8 +188,10 @@ isaac-sim/
 _isaac_sim/
 *.nucleo
 
-# Environment library assets live on USB/drive, not git
-assets/environments/
+# Environment library assets live on USB/drive, not git. The small stand-in
+# URDFs and scene graphs that DO ship are package data under simbiote/assets/.
+simbiote/assets/environments/
+simbiote/assets/mano/
 environment_library/
 hospital_assets/
 

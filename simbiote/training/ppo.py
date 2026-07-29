@@ -17,8 +17,8 @@ handful of PyBullet DIRECT clients turns out to be the bottleneck).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, List, Optional
 
 import numpy as np
 import torch
@@ -45,7 +45,7 @@ class PPOConfig:
 class VecEnvList:
     """Minimal synchronous vector-env: N independent envs, stepped in a loop."""
 
-    def __init__(self, env_fns: List[Callable[[], object]]):
+    def __init__(self, env_fns: list[Callable[[], object]]):
         self.envs = [fn() for fn in env_fns]
         self.num_envs = len(self.envs)
 
@@ -58,7 +58,7 @@ class VecEnvList:
 
     def step(self, actions: np.ndarray):
         obs, rewards, terminated, truncated, infos = [], [], [], [], []
-        for i, (env, action) in enumerate(zip(self.envs, actions)):
+        for i, (env, action) in enumerate(zip(self.envs, actions, strict=True)):
             o, r, term, trunc, info = env.step(action)
             if term or trunc:
                 o = self.reset_one(i)
@@ -67,14 +67,27 @@ class VecEnvList:
             terminated.append(term)
             truncated.append(trunc)
             infos.append(info)
-        return np.stack(obs), np.array(rewards, dtype=np.float32), np.array(terminated), np.array(truncated), infos
+        return (
+            np.stack(obs),
+            np.array(rewards, dtype=np.float32),
+            np.array(terminated),
+            np.array(truncated),
+            infos,
+        )
 
     def close(self):
         for env in self.envs:
             env.close()
 
 
-def compute_gae(rewards: np.ndarray, values: np.ndarray, dones: np.ndarray, last_values: np.ndarray, gamma: float, lam: float):
+def compute_gae(
+    rewards: np.ndarray,
+    values: np.ndarray,
+    dones: np.ndarray,
+    last_values: np.ndarray,
+    gamma: float,
+    lam: float,
+):
     """rewards/values/dones: (T, N). last_values: (N,). Returns advantages, returns, both (T, N)."""
     T, N = rewards.shape
     advantages = np.zeros((T, N), dtype=np.float32)
@@ -90,11 +103,12 @@ def compute_gae(rewards: np.ndarray, values: np.ndarray, dones: np.ndarray, last
 
 
 def train_ppo(
-    env_fns: List[Callable[[], object]],
+    env_fns: list[Callable[[], object]],
     policy: ActorCriticMLP,
-    config: PPOConfig = PPOConfig(),
-    progress_callback: Optional[Callable[[dict], None]] = None,
+    config: PPOConfig | None = None,
+    progress_callback: Callable[[dict], None] | None = None,
 ) -> ActorCriticMLP:
+    config = config or PPOConfig()
     torch.manual_seed(config.seed)
     vec_env = VecEnvList(env_fns)
     optimizer = torch.optim.Adam(policy.parameters(), lr=config.lr)
@@ -143,7 +157,9 @@ def train_ppo(
         with torch.no_grad():
             last_values = policy.forward(torch.as_tensor(obs, dtype=torch.float32))[2].numpy()
 
-        advantages, returns = compute_gae(buf_rewards, buf_values, buf_dones, last_values, config.gamma, config.gae_lambda)
+        advantages, returns = compute_gae(
+            buf_rewards, buf_values, buf_dones, last_values, config.gamma, config.gae_lambda
+        )
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         flat_obs = torch.as_tensor(buf_obs.reshape(T * N, -1), dtype=torch.float32)
@@ -157,13 +173,21 @@ def train_ppo(
             perm = torch.randperm(n_samples)
             for start in range(0, n_samples, config.minibatch_size):
                 idx = perm[start : start + config.minibatch_size]
-                new_log_probs, entropy, values = policy.evaluate_actions(flat_obs[idx], flat_actions[idx])
+                new_log_probs, entropy, values = policy.evaluate_actions(
+                    flat_obs[idx], flat_actions[idx]
+                )
                 ratio = torch.exp(new_log_probs - flat_log_probs[idx])
                 clipped = torch.clamp(ratio, 1 - config.clip_ratio, 1 + config.clip_ratio)
-                policy_loss = -torch.min(ratio * flat_advantages[idx], clipped * flat_advantages[idx]).mean()
+                policy_loss = -torch.min(
+                    ratio * flat_advantages[idx], clipped * flat_advantages[idx]
+                ).mean()
                 value_loss = ((values - flat_returns[idx]) ** 2).mean()
                 entropy_loss = -entropy.mean()
-                loss = policy_loss + config.value_coef * value_loss + config.entropy_coef * entropy_loss
+                loss = (
+                    policy_loss
+                    + config.value_coef * value_loss
+                    + config.entropy_coef * entropy_loss
+                )
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -176,7 +200,9 @@ def train_ppo(
                 {
                     "update": update,
                     "timesteps": timesteps_done,
-                    "mean_episode_return": float(np.mean(episode_returns)) if episode_returns else float("nan"),
+                    "mean_episode_return": float(np.mean(episode_returns))
+                    if episode_returns
+                    else float("nan"),
                     "success_rate": float(np.mean(successes)) if successes else float("nan"),
                     "num_episodes": len(episode_returns),
                 }

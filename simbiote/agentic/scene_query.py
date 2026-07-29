@@ -14,23 +14,25 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
+from simbiote.assets import HOSPITAL_SCENE_GRAPH
 from simbiote.robot_iface.actions import Pose
 
 __all__ = [
     "Location",
-    "SceneObject",
     "SceneGraph",
-    "load_scene",
+    "SceneObject",
     "default_scene_path",
     "list_locations",
     "list_objects",
+    "load_scene",
 ]
 
-_FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "hospital_scene_graph.json"
+_DEFAULT_SCENE = HOSPITAL_SCENE_GRAPH
 
 #: Below this, ``resolve()`` returns None rather than guessing. A wrong id is
 #: worse than a clean "I don't know what you mean" — it sends the robot to the
@@ -40,7 +42,7 @@ _MIN_MATCH_SCORE = 1.0
 
 def default_scene_path() -> Path:
     """The hand-written hospital fixture, used until Step 1's export exists."""
-    return _FIXTURE
+    return _DEFAULT_SCENE
 
 
 @dataclass(frozen=True)
@@ -56,7 +58,7 @@ class Location:
 
     @property
     def names(self) -> tuple[str, ...]:
-        return (self.label,) + self.aliases
+        return (self.label, *self.aliases)
 
 
 @dataclass(frozen=True)
@@ -81,7 +83,7 @@ class SceneObject:
 
     @property
     def names(self) -> tuple[str, ...]:
-        return (self.label,) + self.aliases
+        return (self.label, *self.aliases)
 
 
 @dataclass(frozen=True)

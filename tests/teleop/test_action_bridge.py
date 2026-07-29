@@ -25,13 +25,34 @@ def receiver():
 
 
 def _drain(rx, attempts=50):
-    """Poll until a datagram lands; loopback delivery isn't instantaneous."""
+    """Poll until a *newly arrived* datagram lands.
+
+    Keyed off `rx.received` rather than "latest() is not None": the receiver
+    keeps serving its last action until it goes stale, so a plain None-check
+    returns the previous test phase's value the instant it is called and never
+    waits for the datagram actually under test.
+    """
+    before = rx.received
     for _ in range(attempts):
         action = rx.latest()
-        if action is not None:
+        if action is not None and rx.received > before:
             return action
         time.sleep(0.01)
     return None
+
+
+def _settle(rx, quiet_rounds=5):
+    """Absorb everything still in flight so the next _drain sees only new sends.
+
+    A burst of UDP frames arrives over several milliseconds; without this a
+    later drain can trip on the tail of the previous burst.
+    """
+    quiet = 0
+    while quiet < quiet_rounds:
+        before = rx.received
+        time.sleep(0.01)
+        rx.latest()
+        quiet = quiet + 1 if rx.received == before else 0
 
 
 def test_action_survives_the_round_trip(receiver):
@@ -101,6 +122,7 @@ def test_restarted_teleop_is_not_locked_out(receiver):
         first.apply_action(RobotAction(base_velocity=(0.1, 0.0, 0.0)))
     assert _drain(receiver) is not None
     first.close()
+    _settle(receiver)  # the rest of the burst is still on the wire
 
     # A fresh process: sequence back to 1, but a different sender id.
     second = UdpActionSink(host="127.0.0.1", port=PORT)

@@ -124,7 +124,9 @@ def test_a_degraded_llm_is_reported_in_the_session_result(scene, stage):
     assert result.degraded is True
     assert result.llm["served_by"] == "fake"
 
-    report_path = demo_logger.session_path("test-session-degraded", stage).with_suffix(".report.json")
+    report_path = demo_logger.session_path("test-session-degraded", stage).with_suffix(
+        ".report.json"
+    )
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["llm"]["degraded"] is True
 

@@ -29,12 +29,12 @@ module import cleanly under both interpreters.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import random
 import socket
 import time
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from simbiote.robot_iface.actions import RobotAction
 
@@ -52,7 +52,7 @@ def _encode(action: RobotAction, sequence: int, sender: int) -> bytes:
     ).encode("utf-8")
 
 
-def _decode(payload: bytes) -> Tuple[int, int, RobotAction]:
+def _decode(payload: bytes) -> tuple[int, int, RobotAction]:
     message = json.loads(payload.decode("utf-8"))
     return (
         int(message.get("seq", 0)),
@@ -73,7 +73,7 @@ class UdpActionSink:
 
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
-    _socket: Optional[socket.socket] = None
+    _socket: socket.socket | None = None
     _sequence: int = 0
     _sender_id: int = 0
 
@@ -89,13 +89,11 @@ class UdpActionSink:
 
     def apply_action(self, action: RobotAction) -> None:
         self._sequence += 1
-        try:
+        # Buffer full or no route -- the next frame supersedes this one.
+        with contextlib.suppress(BlockingIOError, OSError):
             self._socket.sendto(
                 _encode(action, self._sequence, self._sender_id), (self.host, self.port)
             )
-        except (BlockingIOError, OSError):
-            # Buffer full or no route -- the next frame supersedes this one.
-            pass
 
     def step(self) -> None:
         pass
@@ -176,14 +174,14 @@ class ActionReceiver:
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._socket.bind((host, port))
         self._socket.setblocking(False)
-        self._last_action: Optional[RobotAction] = None
+        self._last_action: RobotAction | None = None
         self._last_time: float = 0.0
         self._last_sequence: int = -1
         self._last_sender: int = 0
         self.received = 0
         self.dropped = 0
 
-    def latest(self) -> Optional[RobotAction]:
+    def latest(self) -> RobotAction | None:
         """Drain the socket and return the freshest action, or None if stale."""
 
         while True:
@@ -227,7 +225,7 @@ class ActionReceiver:
     def close(self) -> None:
         self._socket.close()
 
-    def __enter__(self) -> "ActionReceiver":
+    def __enter__(self) -> ActionReceiver:
         return self
 
     def __exit__(self, *exc) -> None:

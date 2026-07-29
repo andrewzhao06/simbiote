@@ -3,7 +3,7 @@
 # This is the gate on running the pipeline in production mode.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-preflight="${REPO_ROOT}/scripts/gb10/preflight_mapper.sh"
+preflight="${REPO_ROOT}/scripts/gb10/mapper/preflight_mapper.sh"
 [[ -x "${preflight}" ]] || blocked "preflight script missing: ${preflight}"
 
 out=$("${preflight}" "${AI_ROOT}" "${REPO_ROOT}" 2>&1)

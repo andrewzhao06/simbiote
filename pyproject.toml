@@ -26,17 +26,25 @@ usd = [
 ]
 
 [project.scripts]
-simbiote-map = "src.cli:main"
+simbiote-map = "simbiote.mapper.cli:main"
 simbiote-agentic = "simbiote.agentic.agentic_session:main"
 simbiote-teleop = "simbiote.teleop.teleop_session:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["simbiote*", "src*"]
+include = ["simbiote*"]
+
+# Non-Python payloads the package resolves at runtime: the stand-in URDFs,
+# the toy teleop robot, and the hospital scene graph the agentic module falls
+# back to. Without this they are missing from a built wheel and every path in
+# `robot_config`/`scene_query`/`sim_stub` resolves to a file that isn't there.
+[tool.setuptools.package-data]
+simbiote = ["assets/**/*.urdf", "assets/**/*.json"]
+"simbiote.sim_stub" = ["*.urdf"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
-pythonpath = [".", "src"]
+pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
   "slow: longer-running tests (real PPO convergence, multi-episode rollouts) -- excluded by default via `-m \"not slow\"` in CI-speed runs",
@@ -47,4 +55,7 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+# T20 (print) and TRY003 are deliberately absent: most entry points here are
+# CLIs whose job is to print, and the long-message exceptions are the useful
+# half of the operator errors.
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "ISC", "LOG", "PERF", "PIE", "PTH", "RET", "RUF"]

@@ -7,11 +7,11 @@ import json
 import sys
 from pathlib import Path
 
-from src.config import MapperConfig
-from src.doctor import run_doctor, serialize_checks
-from src.ingest import load_capture_bundle
-from src.pipeline import run_pipeline
-from src.usd import validate_map
+from simbiote.mapper.config import MapperConfig
+from simbiote.mapper.doctor import run_doctor, serialize_checks
+from simbiote.mapper.ingest import load_capture_bundle
+from simbiote.mapper.pipeline import run_pipeline
+from simbiote.mapper.usd import validate_map
 
 
 def _parser() -> argparse.ArgumentParser:

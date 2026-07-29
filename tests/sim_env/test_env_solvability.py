@@ -74,9 +74,9 @@ class TestGraspIsReachable:
         "don't chase accuracy") limitation and would make this a flaky proxy.
         """
         from simbiote.sim_env.grasp_task import (
-            GraspEnv,
             GRASP_DIST_THRESHOLD,
             MAX_EE_STEP,
+            GraspEnv,
         )
 
         for lateral in (0.18, -0.18):
@@ -100,9 +100,9 @@ class TestGraspIsReachable:
     def test_attach_threshold_is_geometrically_achievable(self):
         """Press the EE into the object and check it can actually trigger a grasp."""
         from simbiote.sim_env.grasp_task import (
-            GraspEnv,
             GRASP_DIST_THRESHOLD,
             MAX_EE_STEP,
+            GraspEnv,
         )
 
         env = GraspEnv()
@@ -126,9 +126,9 @@ class TestGraspIsReachable:
         """If a hand-written reach-grasp-lift controller cannot win, a zero
         success rate from PPO says nothing about the policy."""
         from simbiote.sim_env.grasp_task import (
-            GraspEnv,
             GRASP_DIST_THRESHOLD,
             MAX_EE_STEP,
+            GraspEnv,
         )
 
         env = GraspEnv()

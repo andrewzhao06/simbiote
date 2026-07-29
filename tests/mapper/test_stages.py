@@ -10,7 +10,7 @@ import math
 
 import pytest
 
-from src.stages import StageError, _rotate
+from simbiote.mapper.stages import StageError, _rotate, _run_adapter
 
 
 def _reference_rotate(point, quaternion):
@@ -87,6 +87,55 @@ class TestRotate:
             _rotate((1.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0))
 
 
+class TestRunAdapter:
+    """The production adapter boundary: an env-var command template plus paths.
+
+    Nothing else in the suite reaches this branch, and every path it receives
+    is user-supplied (SSD mount, capture folder, repo checkout).
+    """
+
+    @staticmethod
+    def _echo_adapter(tmp_path):
+        """A script that writes its argv, one entry per line, to argv.txt."""
+        script = tmp_path / "adapter with space.sh"
+        script.write_text(
+            '#!/bin/sh\nfor a in "$@"; do echo "$a"; done > "$(dirname "$0")/argv.txt"\n'
+        )
+        script.chmod(0o755)
+        return script
+
+    def test_paths_containing_spaces_reach_the_adapter_intact(self, tmp_path, monkeypatch):
+        """Regression: the template was formatted *then* split, so a space in
+        any substituted path silently became an argument boundary and the
+        adapter was handed a truncated path that does not exist."""
+        script = self._echo_adapter(tmp_path)
+        capture = tmp_path / "my capture"
+        capture.mkdir()
+        monkeypatch.setenv("FF_TEST_ADAPTER", f"'{script}' {{capture}} {{output}}")
+
+        _run_adapter("FF_TEST_ADAPTER", {"capture": capture, "output": tmp_path}, tmp_path)
+
+        assert (tmp_path / "argv.txt").read_text().splitlines() == [
+            str(capture),
+            str(tmp_path),
+        ]
+
+    def test_unset_command_is_a_stage_error(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("FF_TEST_ADAPTER", raising=False)
+        with pytest.raises(StageError, match="Production mode requires"):
+            _run_adapter("FF_TEST_ADAPTER", {"capture": tmp_path}, tmp_path)
+
+    def test_unknown_placeholder_is_a_stage_error_not_a_keyerror(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("FF_TEST_ADAPTER", "/bin/true {nope}")
+        with pytest.raises(StageError, match="placeholder"):
+            _run_adapter("FF_TEST_ADAPTER", {"capture": tmp_path}, tmp_path)
+
+    def test_nonzero_exit_is_a_stage_error(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("FF_TEST_ADAPTER", "/bin/sh -c 'exit 3'")
+        with pytest.raises(StageError, match="exit code 3"):
+            _run_adapter("FF_TEST_ADAPTER", {}, tmp_path)
+
+
 class TestDepthIntrinsicsRegistration:
     """The LiDAR raster is ~7.5x smaller than the RGB frame the intrinsics
     describe (SCAN_MAP.md 4.3). Unprojection must rescale, or the cloud
@@ -96,14 +145,14 @@ class TestDepthIntrinsicsRegistration:
         import numpy as np
         from PIL import Image
 
-        from src.models import (
+        from simbiote.mapper.config import MapperConfig
+        from simbiote.mapper.models import (
             CameraIntrinsics,
             CaptureBundle,
             Frame,
             Pose,
         )
-        from src.config import MapperConfig
-        from src.stages import _preview_points
+        from simbiote.mapper.stages import _preview_points
 
         depth_width, depth_height = 256, 192
         rgb_width = 1920

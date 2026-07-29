@@ -4,7 +4,7 @@
     "train_nav.py reaches the goal without collision..."
     "train_grasp.py clears the same bar on grasp success rate"
 
-Skipped (not failed) when pybullet isn't importable -- see tests/conftest.py
+Skipped (not failed) when pybullet isn't importable -- see conftest.py at the repo root
 and README's "Known issues" (no Windows wheels on PyPI for pybullet).
 """
 
@@ -65,9 +65,13 @@ class TestGraspAttach:
             robot_id = scene.load_robot(STAND_IN_CONFIG, client, fixed_base=True)
             handles = scene.RobotHandles.build(STAND_IN_CONFIG, client, robot_id)
             ee_pos = p.getLinkState(robot_id, handles.ee_link_index, physicsClientId=client)[0]
-            obj = scene.spawn_graspable_box(client, position=(ee_pos[0], ee_pos[1], ee_pos[2]), mass_kg=0.2)
+            obj = scene.spawn_graspable_box(
+                client, position=(ee_pos[0], ee_pos[1], ee_pos[2]), mass_kg=0.2
+            )
 
-            constraint = grasp_attach.attach(robot_id, handles.ee_link_index, obj.body_id, physics_client=client)
+            constraint = grasp_attach.attach(
+                robot_id, handles.ee_link_index, obj.body_id, physics_client=client
+            )
             assert grasp_attach.is_holding(constraint)
 
             # Constraint should hold the object roughly at the EE as the sim steps
@@ -97,12 +101,12 @@ class TestNavEnv:
 
         env = NavEnv(max_steps=20, seed=0)
         try:
-            obs, info = env.reset(seed=0)
+            obs, _info = env.reset(seed=0)
             assert obs.shape == (OBS_DIM,)
             assert env.observation_space.contains(obs)
 
             action = np.zeros(ACT_DIM, dtype=np.float32)
-            obs2, reward, terminated, truncated, info = env.step(action)
+            obs2, reward, terminated, _truncated, _info = env.step(action)
             assert obs2.shape == (OBS_DIM,)
             assert isinstance(reward, float)
             assert isinstance(terminated, bool)
@@ -148,7 +152,7 @@ class TestGraspEnv:
             obs, info = env.reset(seed=0)
             assert obs.shape == (OBS_DIM,)
             action = np.zeros(ACT_DIM, dtype=np.float32)
-            obs2, reward, terminated, truncated, info = env.step(action)
+            obs2, _reward, _terminated, _truncated, info = env.step(action)
             assert obs2.shape == (OBS_DIM,)
             assert "is_holding" in info
         finally:
@@ -168,7 +172,7 @@ class TestGraspEnv:
         # generous headroom rather than tuning the arm to make the test fast.
         env = GraspEnv(max_steps=300, seed=0, object_position_override=(0.45, 0.0, 0.25))
         try:
-            obs, _ = env.reset(seed=0)
+            env.reset(seed=0)
             success = False
             # Phase 1: approach (open gripper, move toward the object's xy/z).
             for _ in range(120):
@@ -176,19 +180,19 @@ class TestGraspEnv:
                 ee_pos = env._get_ee_pos()
                 delta = np.clip(np.array(obj_pos) - np.array(ee_pos), -0.03, 0.03)
                 action = np.array([delta[0], delta[1], delta[2], -1.0], dtype=np.float32)
-                obs, reward, terminated, truncated, info = env.step(action)
+                _obs, _reward, terminated, _truncated, info = env.step(action)
                 if info["ee_object_dist"] < GRASP_DIST_THRESHOLD or terminated:
                     break
             # Phase 2: close the gripper to trigger attach().
             for _ in range(15):
                 action = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32)
-                obs, reward, terminated, truncated, info = env.step(action)
+                _obs, _reward, terminated, _truncated, info = env.step(action)
                 if info.get("grasped_this_step"):
                     break
             # Phase 3: lift straight up while holding.
             for _ in range(80):
                 action = np.array([0.0, 0.0, 0.03, 1.0], dtype=np.float32)
-                obs, reward, terminated, truncated, info = env.step(action)
+                _obs, _reward, terminated, _truncated, info = env.step(action)
                 if info.get("success"):
                     success = True
                     break
@@ -209,7 +213,7 @@ class TestWheelchairEnv:
             obs, _ = env.reset(seed=0)
             assert obs.shape == (OBS_DIM,)
             action = np.zeros(3, dtype=np.float32)
-            obs2, reward, terminated, truncated, info = env.step(action)
+            obs2, _reward, _terminated, _truncated, info = env.step(action)
             assert obs2.shape == (OBS_DIM,)
             assert "tilt" in info
         finally:
@@ -240,14 +244,26 @@ class TestNavTraining:
         without collision noticeably more often than the un-fine-tuned
         baseline") using a short training budget so it stays test-suite-fast.
         """
+        import torch
+
         from simbiote.sim_env.register_envs import make_env, register
         from simbiote.training.policy_net import ActorCriticMLP, PolicyMeta
         from simbiote.training.ppo import PPOConfig, train_ppo
 
         register()
 
+        # Seed everything the run touches. `train_ppo` seeds torch itself, but
+        # only *after* the two policies below are built, and the training envs
+        # defaulted to seed=None -- so the initial weights and the obstacle
+        # layout both varied per run and this convergence check came out a coin
+        # flip. With the seeds fixed the comparison is reproducible.
+        torch.manual_seed(0)
+        np.random.seed(0)
+
+        env_seeds = iter(range(1000, 2000))
+
         def env_fn():
-            return make_env("nav", num_obstacles=1, max_steps=80)
+            return make_env("nav", num_obstacles=1, max_steps=80, seed=next(env_seeds))
 
         probe = env_fn()
         meta = PolicyMeta(
@@ -263,7 +279,14 @@ class TestNavTraining:
         trained = ActorCriticMLP(meta)
         trained.load_state_dict(baseline.state_dict())  # identical random start
 
-        config = PPOConfig(total_timesteps=6000, rollout_steps=200, train_iters=4, minibatch_size=64, lr=1e-3, seed=0)
+        config = PPOConfig(
+            total_timesteps=6000,
+            rollout_steps=200,
+            train_iters=4,
+            minibatch_size=64,
+            lr=1e-3,
+            seed=0,
+        )
         stats = []
         train_ppo([env_fn for _ in range(2)], trained, config, progress_callback=stats.append)
 
@@ -276,7 +299,9 @@ class TestNavTraining:
                 while not done:
                     import torch
 
-                    action, _, _ = policy.act(torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0), deterministic=True)
+                    action, _, _ = policy.act(
+                        torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0), deterministic=True
+                    )
                     obs, reward, terminated, truncated, _ = env.step(action.squeeze(0).numpy())
                     total += reward
                     done = terminated or truncated
@@ -304,7 +329,6 @@ class TestSpawnRobot:
             despawn(robot)
 
     def test_spawn_unknown_engine_raises(self):
-        from dataclasses import replace
 
         from simbiote.robot.robot_config import RIDGEBACK_FRANKA_CONFIG
         from simbiote.sim_env.spawn import spawn_robot

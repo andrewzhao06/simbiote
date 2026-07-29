@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
 from simbiote.agentic.robot_tools import RobotTools, SkillResult, StubBackend
 from simbiote.agentic.task_executor import StepStatus, execute
 from simbiote.agentic.tool_schema import ToolCall

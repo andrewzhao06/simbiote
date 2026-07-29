@@ -16,7 +16,6 @@ stay stable across that swap so `nav_task.py`/`grasp_task.py`/
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -52,7 +51,9 @@ def attach(
         link_state = p.getLinkState(robot_id, ee_link_index, physicsClientId=physics_client)
         ee_pos, ee_orn = link_state[0], link_state[1]
 
-    target_pos, target_orn = p.getBasePositionAndOrientation(target_body_id, physicsClientId=physics_client)
+    target_pos, target_orn = p.getBasePositionAndOrientation(
+        target_body_id, physicsClientId=physics_client
+    )
 
     # JOINT_FIXED welds parentFrame (expressed in the EE link's local frame)
     # to childFrame (expressed in the target body's local frame) so they
@@ -90,7 +91,7 @@ def attach(
     )
 
 
-def release(constraint: Optional[GraspConstraint]) -> None:
+def release(constraint: GraspConstraint | None) -> None:
     """Detach a previously-created grasp. No-op if `constraint` is None so
     call sites can do `release(self._grasp); self._grasp = None` unconditionally.
     """
@@ -101,5 +102,5 @@ def release(constraint: Optional[GraspConstraint]) -> None:
     p.removeConstraint(constraint.constraint_id, physicsClientId=constraint.physics_client)
 
 
-def is_holding(constraint: Optional[GraspConstraint]) -> bool:
+def is_holding(constraint: GraspConstraint | None) -> bool:
     return constraint is not None

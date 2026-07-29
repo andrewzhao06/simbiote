@@ -11,7 +11,8 @@ arrangement that is obviously correct here.
 It also survives the two processes being started independently, in either
 order, from different terminals, with no port to agree on.
 
-Layout under `root` (default `<repo>/stage/control`)::
+Layout under `root` (default `<stage>/control`, where `<stage>` is whatever
+`demo_logger.stage_dir()` resolves to)::
 
     status.json          written by the sim: ready flag, robot pose, locations
     inbox/<seq>.json     written by the client: one instruction
@@ -25,13 +26,22 @@ the reader is polling and would otherwise pick up a half-written file.
 from __future__ import annotations
 
 import json
-import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-DEFAULT_ROOT = Path(__file__).resolve().parent.parent.parent / "stage" / "control"
+from simbiote import demo_logger
+
+
+def default_control_root() -> Path:
+    """`<stage>/control`, resolved the same way every other session artifact is.
+
+    Deriving this from `__file__` (as it used to) puts the queue inside
+    site-packages for an installed copy, and ignores `$SIMBIOTE_STAGE`, so the
+    sim and the client could end up polling two different directories.
+    """
+    return demo_logger.stage_dir() / "control"
 
 
 def _write_atomic(path: Path, payload: dict) -> None:
@@ -39,10 +49,10 @@ def _write_atomic(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(temporary, path)
+    temporary.replace(path)
 
 
-def _read_json(path: Path) -> Optional[dict]:
+def _read_json(path: Path) -> dict | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -52,7 +62,7 @@ def _read_json(path: Path) -> Optional[dict]:
 
 @dataclass
 class ControlQueue:
-    root: Path = field(default_factory=lambda: DEFAULT_ROOT)
+    root: Path = field(default_factory=default_control_root)
 
     def __post_init__(self) -> None:
         self.root = Path(self.root)
@@ -82,7 +92,7 @@ class ControlQueue:
     def publish_status(self, **fields: Any) -> None:
         _write_atomic(self.status_path, {"updated": time.time(), **fields})
 
-    def next_instruction(self) -> Optional[tuple[str, str]]:
+    def next_instruction(self) -> tuple[str, str] | None:
         """Oldest unprocessed instruction as (seq, text), or None."""
         pending = sorted(self.inbox.glob("*.json"))
         for path in pending:
@@ -98,7 +108,7 @@ class ControlQueue:
 
     # -- client side --------------------------------------------------------
 
-    def status(self) -> Optional[dict]:
+    def status(self) -> dict | None:
         if not self.status_path.is_file():
             return None
         return _read_json(self.status_path)
@@ -117,7 +127,7 @@ class ControlQueue:
         _write_atomic(self.inbox / f"{seq}.json", {"instruction": instruction, "sent": time.time()})
         return seq
 
-    def await_result(self, seq: str, timeout_s: float = 900.0, poll_s: float = 0.5) -> Optional[dict]:
+    def await_result(self, seq: str, timeout_s: float = 900.0, poll_s: float = 0.5) -> dict | None:
         deadline = time.time() + timeout_s
         path = self.outbox / f"{seq}.json"
         while time.time() < deadline:

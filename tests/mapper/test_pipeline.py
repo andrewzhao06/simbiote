@@ -3,10 +3,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from src.config import MapperConfig
-from src.pipeline import run_pipeline
-from src.usd import validate_map
-from .fixtures import capture_dir
+from simbiote.mapper.config import MapperConfig
+from simbiote.mapper.pipeline import run_pipeline
+from simbiote.mapper.usd import validate_map
 
 
 def _config(tmp_path: Path, *, mode: str = "proxy") -> MapperConfig:

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Optional
 
 from simbiote.robot_iface.trajectory import Trajectory
 from simbiote.sim_env.register_envs import make_env, register
@@ -24,7 +23,9 @@ from simbiote.training.policy_net import ActorCriticMLP
 from simbiote.training.ppo import PPOConfig, train_ppo
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-DEMO_STORE_DIR = REPO_ROOT / "var" / "simbiote" / "stage" / "demos"  # matches §3's write-scoped stage dir
+DEMO_STORE_DIR = (
+    REPO_ROOT / "var" / "simbiote" / "stage" / "demos"
+)  # matches §3's write-scoped stage dir
 CHECKPOINT_DIR = REPO_ROOT / "checkpoints"
 
 # Demo file paths are built directly from `Trajectory.task`/`session_id`
@@ -59,21 +60,21 @@ def ingest_demo(trajectory: Trajectory) -> Path:
     return out_path
 
 
-def list_demos(task: str) -> List[Path]:
+def list_demos(task: str) -> list[Path]:
     return sorted(_task_demo_dir(task).glob("*.json"))
 
 
-def load_all_demos(task: str) -> List[Trajectory]:
+def load_all_demos(task: str) -> list[Trajectory]:
     return [Trajectory.load(p) for p in list_demos(task)]
 
 
 def finetune_policy(
     task: str,
-    current_checkpoint: Optional[str | Path] = None,
+    current_checkpoint: str | Path | None = None,
     bc_epochs: int = 30,
     ppo_timesteps: int = 4_000,
     num_envs: int = 2,
-    out_path: Optional[str | Path] = None,
+    out_path: str | Path | None = None,
     seed: int = 0,
 ) -> Path:
     """OpenClaw tool: `finetune_policy()`. Runs the full "BC on ingested
@@ -88,7 +89,8 @@ def finetune_policy(
     if not demos:
         raise RuntimeError(
             f"finetune_policy('{task}'): no ingested demos found in {_task_demo_dir(task)} "
-            "-- call ingest_demo() first, or use bc_pretrain.train_bc() directly against toy trajectories."
+            "-- call ingest_demo() first, or use bc_pretrain.train_bc() directly "
+            "against toy trajectories."
         )
 
     register()

@@ -3,8 +3,8 @@
 Hand teleop drives; this hands the robot to the trained nav policy for a
 long trip across the building, then gives control back.
 
-    ./.venv/bin/python scripts/gb10/teleop_command.py --goto nurse_station
-    ./.venv/bin/python scripts/gb10/teleop_command.py --list
+    ./.venv/bin/python scripts/gb10/teleop/teleop_command.py --goto nurse_station
+    ./.venv/bin/python scripts/gb10/teleop/teleop_command.py --list
 
 Runs in the repo .venv (or any interpreter) -- it only needs stdlib plus
 `simbiote.teleop.action_bridge`, and never touches Isaac directly.
@@ -16,7 +16,15 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# These scripts are run by path (often under Isaac Sim's bundled interpreter,
+# where the package isn't installed), so put the repo on sys.path. Located by
+# walking up to pyproject.toml rather than by a fixed parent count, which
+# silently breaks the moment the file moves between script subdirectories.
+REPO_ROOT = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file()
+)
+sys.path.insert(0, str(REPO_ROOT))
 
 from simbiote.sim_env.hospital_map import HOSPITAL_LOCATIONS  # noqa: E402
 from simbiote.teleop.action_bridge import DEFAULT_COMMAND_PORT, send_command  # noqa: E402

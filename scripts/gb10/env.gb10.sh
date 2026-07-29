@@ -8,7 +8,7 @@
 # so this is the only pxr on the box (see docs/SSD_LAYOUT.md).
 #
 # Usage: source scripts/gb10/env.gb10.sh, then run:
-# $FF_PY -m src.cli ...
+# $FF_PY -m simbiote.mapper.cli ...
 
 ISAAC_ROOT=/home/dell/IsaacSim/_build/linux-aarch64/release
 USD_LIBS="$ISAAC_ROOT/extscache/omni.usd.libs-1.0.3+6312fa25.la64.r.cp312"

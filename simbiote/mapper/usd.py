@@ -8,7 +8,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.models import SceneGraph, SceneNode
+from simbiote.mapper.models import SceneGraph, SceneNode
 
 
 @dataclass(slots=True)

@@ -26,7 +26,7 @@ and stops the arm from unfolding into the building.
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -65,12 +65,12 @@ class ArmLift:
         self.hospital = hospital
         self.robot = hospital.robot
 
-        self.arm_dofs: List[int] = [
+        self.arm_dofs: list[int] = [
             self.robot.get_dof_index(name)
             for name in self.robot.dof_names
             if name.startswith("panda_joint")
         ]
-        self.finger_dofs: List[int] = [
+        self.finger_dofs: list[int] = [
             self.robot.get_dof_index(name)
             for name in self.robot.dof_names
             if "finger" in name.lower()
@@ -99,7 +99,7 @@ class ArmLift:
                 prim.initialize(self.hospital.sim.physics_sim_view)
                 prim.get_world_pose()  # fail now rather than mid-session
                 return prim
-            except Exception as exc:  # noqa: BLE001 - try the next candidate
+            except Exception as exc:
                 errors.append(f"{name}: {exc}")
         raise RuntimeError(
             "could not bind an end-effector body. Tried:\n  " + "\n  ".join(errors)
@@ -194,4 +194,4 @@ class ArmLift:
     def hold(self) -> None:
         """Keep the arm where it is (drive mode) -- targets simply aren't changed."""
 
-        return None
+        return

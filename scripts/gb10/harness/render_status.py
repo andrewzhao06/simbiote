@@ -100,8 +100,8 @@ def build_block(report: dict, parts: list) -> str:
 
     lines = [
         BEGIN,
-        f"<!-- generated {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} "
-        f"from reports/{stamp}.json -- do not edit by hand, run ./render_status.py -->",
+        (f"<!-- generated {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} "
+        f"from reports/{stamp}.json -- do not edit by hand, run ./render_status.py -->"),
         "",
         "| # | Part | Checks | Owner | State |",
         "| :-- | :---- | :---- | :---- | :---- |",
@@ -118,10 +118,10 @@ def build_block(report: dict, parts: list) -> str:
 
     lines += [
         "",
-        f"Source: `reports/{stamp}.json` — "
+        (f"Source: `reports/{stamp}.json` — "
         f"PASS {summary.get('pass', 0)} · FAIL {summary.get('fail', 0)} · "
         f"BLOCKED {summary.get('blocked', 0)} · SKIP {summary.get('skip', 0)}. "
-        f"Regenerate with `./render_status.py`; trend with `./trend.py`.",
+        f"Regenerate with `./render_status.py`; trend with `./trend.py`."),
         END,
     ]
     return "\n".join(lines)
@@ -152,19 +152,19 @@ def splice(text: str, block: str) -> str:
         if lines[j].startswith("## "):
             end = j
             break
-    new = lines[: start + 1] + ["", block, ""] + lines[end:]
+    new = [*lines[:start + 1], "", block, "", *lines[end:]]
     return "\n".join(new) + ("\n" if text.endswith("\n") else "")
 
 
 def atomic_write(path: Path, content: str) -> None:
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".status.", suffix=".tmp")
+    fd, name = tempfile.mkstemp(dir=str(path.parent), prefix=".status.", suffix=".tmp")
+    tmp = Path(name)
     try:
         with os.fdopen(fd, "w") as fh:
             fh.write(content)
-        os.replace(tmp, path)
+        tmp.replace(path)
     except BaseException:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+        tmp.unlink(missing_ok=True)
         raise
 
 
@@ -189,16 +189,23 @@ def main() -> int:
         print(block)
         return 0
 
-    original = status_path.read_text() if status_path.exists() else "# GB10 build-out status\n\n## Parts\n"
+    original = (
+        status_path.read_text() if status_path.exists() else "# GB10 build-out status\n\n## Parts\n"
+    )
     updated = splice(original, block)
 
     if args.check:
         # Ignore the generation timestamp line, which always differs.
         def strip_ts(s):
-            return "\n".join(l for l in s.splitlines() if not l.startswith("<!-- generated "))
+            return "\n".join(
+                line for line in s.splitlines()
+                if not line.startswith("<!-- generated ")
+            )
 
         if strip_ts(original) != strip_ts(updated):
-            print(f"render_status: {status_path} is STALE -- run ./render_status.py", file=sys.stderr)
+            print(
+                f"render_status: {status_path} is STALE -- run ./render_status.py", file=sys.stderr
+            )
             return 1
         print(f"render_status: {status_path} is up to date")
         return 0

@@ -11,13 +11,14 @@ log it for Step 2's fine-tune loop.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import time
-from typing import Optional, Protocol
+from typing import Protocol
 
 from simbiote import demo_logger
 from simbiote.robot_iface.actions import RobotAction
 from simbiote.teleop.action_bridge import DEFAULT_HOST, DEFAULT_PORT
-from simbiote.teleop.camera_source import CameraSource, FrameSource, open_camera
+from simbiote.teleop.camera_source import CameraSource, open_camera
 from simbiote.teleop.hand_tracking import create_tracker, resolve_backend
 from simbiote.teleop.ik_bridge import IKBridge
 from simbiote.teleop.preview import PreviewWindow
@@ -54,7 +55,11 @@ class ConsoleRobotSink:
     def apply_action(self, action: RobotAction) -> None:
         vx, vy, omega = action.base_velocity
         pose = action.arm_target_pose
-        arm = f"({pose.position[0]:.2f},{pose.position[1]:.2f},{pose.position[2]:.2f})" if pose else "none"
+        arm = (
+            f"({pose.position[0]:.2f},{pose.position[1]:.2f},{pose.position[2]:.2f})"
+            if pose
+            else "none"
+        )
         print(
             f"[teleop] base=({vx:+.2f},{vy:+.2f},{omega:+.2f}) "
             f"arm={arm} gripper={action.gripper_state.value}"
@@ -71,11 +76,11 @@ class TeleopSession:
     def __init__(
         self,
         robot_sink: RobotSink,
-        camera_index: Optional[int] = None,
+        camera_index: int | None = None,
         target_fps: int = 30,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         show_preview: bool = False,
-        camera_source: Optional[CameraSource] = None,
+        camera_source: CameraSource | None = None,
         backend: str = "auto",
         sink_name: str = "console",
         mirror: bool = True,
@@ -117,7 +122,7 @@ class TeleopSession:
         self._fps = 0.0
         self._running = False
 
-    def run(self, max_frames: Optional[int] = None) -> str:
+    def run(self, max_frames: int | None = None) -> str:
         """Runs the teleop loop until stopped or max_frames is reached.
 
         Returns the session_id so the caller can export/save the trajectory.
@@ -159,9 +164,10 @@ class TeleopSession:
                 self.robot_sink.step()
                 demo_logger.log_action(action, source="teleop", session_id=self.session_id)
 
-                if self.show_preview:
-                    if not self.preview.show(frame, landmarks, action, self._fps):
-                        self._running = False
+                if self.show_preview and not self.preview.show(
+                    frame, landmarks, action, self._fps
+                ):
+                    self._running = False
 
                 frame_count += 1
                 if max_frames is not None and frame_count >= max_frames:
@@ -199,10 +205,8 @@ class TeleopSession:
             f"[teleop] camera stopped delivering frames -- reconnecting "
             f"({self._reconnects}/{self.max_reconnects}). Is the phone app foregrounded?"
         )
-        try:
+        with contextlib.suppress(Exception):  # it's already broken
             self.camera.release()
-        except Exception:  # noqa: BLE001 - it's already broken
-            pass
 
         try:
             self.camera = open_camera(
@@ -257,8 +261,12 @@ def main() -> None:
              "(the GB10 case -- mediapipe has no aarch64 wheel).",
     )
     parser.add_argument(
-        "--no-mirror", action="store_true",
-        help="Don't horizontally flip the feed (flip is on by default so the preview reads like a mirror).",
+        "--no-mirror",
+        action="store_true",
+        help=(
+            "Don't horizontally flip the feed (flip is on by default so the preview "
+            "reads like a mirror)."
+        ),
     )
     parser.add_argument(
         "--rotate", type=int, choices=[0, 90, 180, 270], default=0,
@@ -285,22 +293,33 @@ def main() -> None:
     )
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--session-id", type=str, default=None)
-    parser.add_argument("--max-frames", type=int, default=None, help="Stop after N frames (omit to run until Ctrl+C or 'q').")
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=None,
+        help="Stop after N frames (omit to run until Ctrl+C or 'q').",
+    )
     parser.add_argument(
         "--sink", choices=["console", "pybullet", "udp"], default="pybullet",
         help="'pybullet' opens a GUI viewer with the toy stand-in robot; 'console' just prints "
              "actions (no extra deps); 'udp' streams them to a simulator in another process "
-             "(Isaac Sim -- see scripts/gb10/teleop_hospital.py).",
+             "(Isaac Sim -- see scripts/gb10/teleop/teleop_hospital.py).",
     )
     parser.add_argument("--udp-host", default=DEFAULT_HOST, help="Host for --sink udp.")
     parser.add_argument("--udp-port", type=int, default=DEFAULT_PORT, help="Port for --sink udp.")
-    parser.add_argument("--no-gui", action="store_true", help="Run the pybullet sink headless (DIRECT mode).")
+    parser.add_argument(
+        "--no-gui", action="store_true", help="Run the pybullet sink headless (DIRECT mode)."
+    )
     parser.add_argument(
         "--preview", action=argparse.BooleanOptionalAction, default=True,
         help="Show the live window: camera feed + hand skeleton + the RobotAction it retargets to. "
              "On by default; --no-preview runs headless.",
     )
-    parser.add_argument("--save", action="store_true", help="Print where the trajectory was saved when the session ends.")
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Print where the trajectory was saved when the session ends.",
+    )
     args = parser.parse_args()
 
     robot_sink = _build_robot_sink(

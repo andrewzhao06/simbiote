@@ -35,24 +35,24 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from simbiote.robot_iface.actions import RobotAction
 from simbiote.robot_iface.trajectory import DemoSource, Trajectory, TrajectoryStep
 
 __all__ = [
-    "start_session",
-    "log_action",
-    "export_trajectory",
     "end_session",
+    "export_trajectory",
+    "log_action",
     "new_session_id",
-    "stage_dir",
     "session_path",
+    "stage_dir",
+    "start_session",
     "write_report",
 ]
 
-_active_sessions: Dict[str, Trajectory] = {}
-_current_session_id: Optional[str] = None
+_active_sessions: dict[str, Trajectory] = {}
+_current_session_id: str | None = None
 
 #: Per Part 3 (security architecture), the process only has write access to
 #: /var/simbiote/stage on the real box. On a dev laptop that path won't
@@ -60,7 +60,7 @@ _current_session_id: Optional[str] = None
 _SANDBOX_STAGE = "/var/simbiote/stage"
 
 
-def stage_dir(override: Optional[str | os.PathLike[str]] = None) -> Path:
+def stage_dir(override: str | os.PathLike[str] | None = None) -> Path:
     """Resolve the writable staging directory.
 
     Precedence: explicit argument, then `$SIMBIOTE_STAGE`, then the sandbox
@@ -82,12 +82,12 @@ def new_session_id(source: DemoSource = "teleop") -> str:
     return f"{source}-{stamp}-{suffix}"
 
 
-def session_path(session_id: str, stage: Optional[str | os.PathLike[str]] = None) -> Path:
+def session_path(session_id: str, stage: str | os.PathLike[str] | None = None) -> Path:
     return stage_dir(stage) / "sessions" / f"{session_id}.jsonl"
 
 
 def start_session(
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     source: DemoSource = "teleop",
     task: str = "nav",
 ) -> str:
@@ -104,13 +104,13 @@ def start_session(
 def log_action(
     action: RobotAction,
     source: DemoSource,
-    observation: Optional[List[float]] = None,
+    observation: list[float] | None = None,
     reward: float = 0.0,
-    session_id: Optional[str] = None,
-    skill: Optional[str] = None,
+    session_id: str | None = None,
+    skill: str | None = None,
     ok: bool = True,
-    t: Optional[float] = None,
-    stage: Optional[str | os.PathLike[str]] = None,
+    t: float | None = None,
+    stage: str | os.PathLike[str] | None = None,
 ) -> TrajectoryStep:
     """spec: `log_action(action, source: "teleop"|"agentic")`. `observation`
     is optional but should be supplied whenever available -- `bc_pretrain.py`
@@ -130,7 +130,9 @@ def log_action(
 
     traj = _active_sessions[sid]
     if traj.source != source:
-        raise ValueError(f"log_action: source '{source}' doesn't match session '{sid}''s source '{traj.source}'")
+        raise ValueError(
+            f"log_action: source '{source}' doesn't match session '{sid}''s source '{traj.source}'"
+        )
 
     timestamp = time.time() if t is None else t
     step = TrajectoryStep(
@@ -152,7 +154,9 @@ def log_action(
     return step
 
 
-def export_trajectory(session_id: Optional[str] = None, stage: Optional[str | os.PathLike[str]] = None) -> Trajectory:
+def export_trajectory(
+    session_id: str | None = None, stage: str | os.PathLike[str] | None = None
+) -> Trajectory:
     """spec: `export_trajectory(session_id) -> Trajectory`. Read-only —
     doesn't end the session, so a caller can export mid-session for a live
     preview (e.g. an audit trail, §3).
@@ -172,7 +176,7 @@ def export_trajectory(session_id: Optional[str] = None, stage: Optional[str | os
     if not path.exists():
         raise KeyError(f"demo_logger.export_trajectory: no session '{sid}'")
 
-    steps: List[TrajectoryStep] = []
+    steps: list[TrajectoryStep] = []
     source: DemoSource = "teleop"
     with path.open("r", encoding="utf-8") as fh:
         for lineno, line in enumerate(fh, start=1):
@@ -190,14 +194,13 @@ def export_trajectory(session_id: Optional[str] = None, stage: Optional[str | os
     return Trajectory(session_id=sid, source=source, task="nav", steps=steps)
 
 
-def end_session(session_id: Optional[str] = None) -> Trajectory:
+def end_session(session_id: str | None = None) -> Trajectory:
     """Export and drop a session from memory (call this once a teleop/agentic
     run completes, before handing the Trajectory to `ingest_demo()`)."""
     global _current_session_id
     trajectory = export_trajectory(session_id)
     sid = session_id or _current_session_id
-    if sid in _active_sessions:
-        del _active_sessions[sid]
+    _active_sessions.pop(sid, None)
     if _current_session_id == sid:
         _current_session_id = None
     return trajectory
@@ -205,8 +208,8 @@ def end_session(session_id: Optional[str] = None) -> Trajectory:
 
 def write_report(
     session_id: str,
-    report: Dict[str, Any],
-    stage: Optional[str | os.PathLike[str]] = None,
+    report: dict[str, Any],
+    stage: str | os.PathLike[str] | None = None,
 ) -> Path:
     """Write the execution-report sidecar next to the trajectory.
 

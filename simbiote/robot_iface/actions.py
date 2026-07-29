@@ -34,39 +34,40 @@ role packages can import it without pulling in PyBullet/Isaac/torch.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Optional, Tuple
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 
-class GripperState(str, Enum):
-    """Binary gripper command. Matches spec: `gripper_state: open|closed`."""
+class GripperState(StrEnum):
+    """Binary gripper command. Matches spec: `gripper_state: open|closed`.
+
+    ``StrEnum`` so ``str(state)`` and ``f"{state}"`` both yield the bare value
+    the schema specifies, not ``GripperState.OPEN``.
+    """
 
     OPEN = "open"
     CLOSED = "closed"
-
-    def __str__(self) -> str:  # keeps f-strings/log lines readable
-        return self.value
 
 
 @dataclass(frozen=True)
 class Pose:
     """A 6-DOF pose: position in meters, orientation as an xyzw quaternion."""
 
-    position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
-    orientation: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+    position: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    orientation: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 
-    def as_tuple(self) -> Tuple[float, ...]:
+    def as_tuple(self) -> tuple[float, ...]:
         return tuple(self.position) + tuple(self.orientation)
 
     @classmethod
-    def from_tuple(cls, values: Tuple[float, ...]) -> "Pose":
+    def from_tuple(cls, values: tuple[float, ...]) -> Pose:
         if len(values) != 7:
             raise ValueError(f"Pose.from_tuple expects 7 values, got {len(values)}")
         return cls(position=tuple(values[0:3]), orientation=tuple(values[3:7]))
 
     @classmethod
-    def from_xyz(cls, xyz: Tuple[float, float, float]) -> "Pose":
+    def from_xyz(cls, xyz: tuple[float, float, float]) -> Pose:
         """Convenience constructor for a position-only pose (identity orientation)."""
         return cls(position=(float(xyz[0]), float(xyz[1]), float(xyz[2])))
 
@@ -74,7 +75,7 @@ class Pose:
         return {"position": list(self.position), "orientation": list(self.orientation)}
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Pose":
+    def from_dict(cls, d: dict) -> Pose:
         """Accepts either the canonical nested form (`position`/`orientation`
         lists) or the flat `x, y, z, qx, qy, qz, qw` form some scene-graph
         fixtures use -- both were in circulation before this schema merged."""
@@ -138,11 +139,11 @@ class RobotAction:
     pure navigation) rather than a synthesised default -- see module docstring.
     """
 
-    base_velocity: Tuple[float, float, float] = (0.0, 0.0, 0.0)  # (vx, vy, omega)
-    arm_target_pose: Optional[Pose] = None
+    base_velocity: tuple[float, float, float] = (0.0, 0.0, 0.0)  # (vx, vy, omega)
+    arm_target_pose: Pose | None = None
     gripper_state: GripperState = GripperState.OPEN
 
-    def to_vector(self) -> Tuple[float, ...]:
+    def to_vector(self) -> tuple[float, ...]:
         """Flatten to a fixed-length numeric vector for BC/PPO nets.
 
         Layout: [vx, vy, omega, ee_x, ee_y, ee_z, ee_qx, ee_qy, ee_qz, ee_qw, gripper]
@@ -157,7 +158,7 @@ class RobotAction:
         return tuple(self.base_velocity) + pose.as_tuple() + (gripper,)
 
     @classmethod
-    def from_vector(cls, values: Tuple[float, ...]) -> "RobotAction":
+    def from_vector(cls, values: tuple[float, ...]) -> RobotAction:
         if len(values) != 11:
             raise ValueError(f"RobotAction.from_vector expects 11 values, got {len(values)}")
         base_velocity = tuple(values[0:3])
@@ -168,12 +169,14 @@ class RobotAction:
     def to_dict(self) -> dict[str, Any]:
         return {
             "base_velocity": list(self.base_velocity),
-            "arm_target_pose": self.arm_target_pose.to_dict() if self.arm_target_pose is not None else None,
+            "arm_target_pose": self.arm_target_pose.to_dict()
+            if self.arm_target_pose is not None
+            else None,
             "gripper_state": self.gripper_state.value,
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "RobotAction":
+    def from_dict(cls, d: dict[str, Any]) -> RobotAction:
         pose = d.get("arm_target_pose")
         bv = d.get("base_velocity") or (0.0, 0.0, 0.0)
         return cls(

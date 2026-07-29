@@ -26,17 +26,27 @@ import time
 from pathlib import Path
 
 sys.stdout.reconfigure(line_buffering=True)
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+# These scripts are run by path (often under Isaac Sim's bundled interpreter,
+# where the package isn't installed), so put the repo on sys.path. Located by
+# walking up to pyproject.toml rather than by a fixed parent count, which
+# silently breaks the moment the file moves between script subdirectories.
+REPO_ROOT = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file()
+)
+sys.path.insert(0, str(REPO_ROOT))
 
-REPO = Path(__file__).resolve().parents[3]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--headless", action="store_true", help="no window")
 parser.add_argument("--llm", default="openai-compat", choices=["openai-compat", "fake"])
 parser.add_argument("--profile", default=None, help="LLM profile name")
-parser.add_argument("--nav-checkpoint", default=str(REPO / "checkpoints" / "nav_bc.pt"))
-parser.add_argument("--scene", default=str(REPO / "simbiote" / "fixtures" / "hospital_scene_graph.json"))
-parser.add_argument("--stage", default=str(REPO / "stage"))
+parser.add_argument("--nav-checkpoint", default=str(REPO_ROOT / "checkpoints" / "nav_bc.pt"))
+parser.add_argument(
+    "--scene",
+    default=str(REPO_ROOT / "simbiote" / "assets" / "scenes" / "hospital_scene_graph.json"),
+)
+parser.add_argument("--stage", default=str(REPO_ROOT / "stage"))
 parser.add_argument("--control-root", default=None, help="command queue directory")
 parser.add_argument(
     "--light",
@@ -120,7 +130,7 @@ hospital = IsaacHospital(
 )
 
 from simbiote.agentic.agentic_session import run_session  # noqa: E402
-from simbiote.agentic.control_queue import DEFAULT_ROOT, ControlQueue  # noqa: E402
+from simbiote.agentic.control_queue import ControlQueue, default_control_root  # noqa: E402
 from simbiote.agentic.llm_backend import describe_backend, make_backend  # noqa: E402
 from simbiote.agentic.robot_tools import IsaacBackend  # noqa: E402
 from simbiote.agentic.scene_query import load_scene  # noqa: E402
@@ -128,12 +138,12 @@ from simbiote.agentic.scene_query import load_scene  # noqa: E402
 scene = load_scene(args.scene)
 robot = IsaacBackend(
     nav_checkpoint=args.nav_checkpoint,
-    grasp_checkpoint=str(REPO / "checkpoints" / "grasp_bc.pt"),
+    grasp_checkpoint=str(REPO_ROOT / "checkpoints" / "grasp_bc.pt"),
     hospital=hospital,
 )
 llm = make_backend(args.llm, scene, profile=args.profile)
 
-queue = ControlQueue(Path(args.control_root) if args.control_root else DEFAULT_ROOT)
+queue = ControlQueue(Path(args.control_root) if args.control_root else default_control_root())
 queue.reset()
 
 
@@ -169,7 +179,7 @@ def handle(seq: str, instruction: str) -> None:
 
     try:
         result = run_session(instruction, scene, llm, robot, stage=args.stage)
-    except Exception as exc:  # noqa: BLE001 - one bad command must not kill the sim
+    except Exception as exc:
         print(f"  error: {exc}\n")
         queue.publish_result(seq, {"ok": False, "error": str(exc), "instruction": instruction})
         announce(busy=False)
@@ -198,7 +208,9 @@ def handle(seq: str, instruction: str) -> None:
     if result.error:
         print(f"  could not plan: {result.error}\n")
     else:
-        plan = " -> ".join(f"{c.tool}({', '.join(str(v) for v in c.args.values())})" for c in result.calls)
+        plan = " -> ".join(
+            f"{c.tool}({', '.join(str(v) for v in c.args.values())})" for c in result.calls
+        )
         print(f"  plan: {plan}")
         for step in payload["steps"]:
             print(f"    {step['tool']}: {step['status']} ({step['duration_s']}s)")

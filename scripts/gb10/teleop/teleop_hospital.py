@@ -6,13 +6,13 @@ and WiLoR). See `simbiote/teleop/action_bridge.py` for why it's split.
 
     # terminal 1 -- the simulator
     /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-        scripts/gb10/teleop_hospital.py
+        scripts/gb10/teleop/teleop_hospital.py
 
     # terminal 2 -- camera + hand tracking + the preview window
     ./.venv/bin/python scripts/teleop/run_demo.py --sink udp \
         --camera-url http://<iphone-ip>:4747/video/640x480
 
-Or use `scripts/gb10/run_teleop_hospital.sh`, which starts both.
+Or use `scripts/gb10/teleop/run_teleop_hospital.sh`, which starts both.
 
 What the hand controls
 ----------------------
@@ -46,7 +46,15 @@ import time
 from pathlib import Path
 
 sys.stdout.reconfigure(line_buffering=True)
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# These scripts are run by path (often under Isaac Sim's bundled interpreter,
+# where the package isn't installed), so put the repo on sys.path. Located by
+# walking up to pyproject.toml rather than by a fixed parent count, which
+# silently breaks the moment the file moves between script subdirectories.
+REPO_ROOT = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file()
+)
+sys.path.insert(0, str(REPO_ROOT))
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument(
@@ -58,7 +66,9 @@ parser.add_argument(
 parser.add_argument("--headless", action="store_true", help="No Isaac Sim window (for testing).")
 parser.add_argument("--port", type=int, default=47800)
 parser.add_argument("--host", default="0.0.0.0")
-parser.add_argument("--speed-scale", type=float, default=1.0, help="Scale hand-commanded base velocity.")
+parser.add_argument(
+    "--speed-scale", type=float, default=1.0, help="Scale hand-commanded base velocity."
+)
 parser.add_argument(
     "--frame", choices=["body", "world"], default="body",
     help="Interpret the hand's velocity in the robot's own frame (default) or the world's. "
@@ -67,7 +77,9 @@ parser.add_argument(
          "'forward' would still mean world +X. 'body' rotates the command by the base yaw so "
          "forward means wherever the robot is facing.",
 )
-parser.add_argument("--max-seconds", type=float, default=0.0, help="Auto-exit after N seconds (0 = run forever).")
+parser.add_argument(
+    "--max-seconds", type=float, default=0.0, help="Auto-exit after N seconds (0 = run forever)."
+)
 parser.add_argument(
     "--spawn", type=float, nargs=2, default=None, metavar=("X", "Y"),
     help="Override the spawn position in hospital world coordinates.",
@@ -77,11 +89,11 @@ args = parser.parse_args()
 # Imports below deliberately follow argparse: pulling in isaac_nav starts the
 # chain that boots SimulationApp, and `--help` shouldn't cost a simulator boot.
 from simbiote.robot_iface.actions import GripperState  # noqa: E402
-from simbiote.sim_env.hospital_map import SPAWN  # noqa: E402
 from simbiote.sim_env.arm_lift import ArmLift  # noqa: E402
+from simbiote.sim_env.hospital_map import SPAWN  # noqa: E402
 from simbiote.sim_env.isaac_nav import CONTROL_HZ, PHYSICS_HZ, IsaacHospital  # noqa: E402
-from simbiote.teleop.ik_bridge import WORKSPACE_Z_MAX, WORKSPACE_Z_MIN  # noqa: E402
 from simbiote.teleop.action_bridge import ActionReceiver, CommandReceiver  # noqa: E402
+from simbiote.teleop.ik_bridge import WORKSPACE_Z_MAX, WORKSPACE_Z_MIN  # noqa: E402
 
 
 def main() -> int:

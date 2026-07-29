@@ -9,7 +9,7 @@ the `RobotAction` it produces.
 
 ```bash
 cd ~/simbiote
-scripts/gb10/run_teleop_hospital.sh http://<iphone-ip>:4747/video/640x480
+scripts/gb10/teleop/run_teleop_hospital.sh http://<iphone-ip>:4747/video/640x480
 ```
 
 That script starts both halves and shuts both down on Ctrl+C. It checks the
@@ -21,7 +21,7 @@ To run them separately (useful when iterating — you avoid re-booting Isaac):
 ```bash
 # terminal 1 -- the simulator. First boot takes a few minutes.
 /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-    scripts/gb10/teleop_hospital.py
+    scripts/gb10/teleop/teleop_hospital.py
 
 # terminal 2 -- camera, hand tracking, preview window
 ./.venv/bin/python scripts/teleop/run_demo.py --sink udp \

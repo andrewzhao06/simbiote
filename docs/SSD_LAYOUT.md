@@ -24,6 +24,6 @@ AI/
 └── captures/            # Stray Scanner exports; never commit to Git
 ```
 
-Run `scripts/setup_gb10_mapper.sh <SSD mount>` on the GB10 to create the
+Run `scripts/mapper/setup_gb10_mapper.sh <SSD mount>` on the GB10 to create the
 mapper configuration. Then build Isaac Sim and install Isaac Lab on that
 machine; their Linux ARM64 build artifacts are not portable from Windows.

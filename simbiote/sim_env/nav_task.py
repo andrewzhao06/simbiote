@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -37,7 +37,7 @@ ACT_DIM = 3  # vx, vy, omega
 class NavEnv(gym.Env if gym is not None else object):
     """Collision-free point-to-point navigation for the stand-in mobile base."""
 
-    metadata = {"render_modes": ["human"]}
+    metadata: ClassVar[dict] = {"render_modes": ["human"]}
 
     def __init__(
         self,
@@ -48,8 +48,8 @@ class NavEnv(gym.Env if gym is not None else object):
         sim_steps_per_action: int = 8,
         goal_threshold: float = 0.25,
         gui: bool = False,
-        seed: Optional[int] = None,
-        goal_override: Optional[Tuple[float, float]] = None,
+        seed: int | None = None,
+        goal_override: tuple[float, float] | None = None,
         spawn_clearance: float = 0.6,
         obstacle_spacing: float = 0.5,
         min_goal_distance: float = 1.0,
@@ -76,24 +76,26 @@ class NavEnv(gym.Env if gym is not None else object):
         self.goal_override = goal_override
 
         limits = robot_config.action_limits
-        act_high = np.array([limits.max_linear_vel, limits.max_linear_vel, limits.max_angular_vel], dtype=np.float32)
+        act_high = np.array(
+            [limits.max_linear_vel, limits.max_linear_vel, limits.max_angular_vel], dtype=np.float32
+        )
         self.action_space = spaces.Box(low=-act_high, high=act_high, dtype=np.float32)
 
         obs_high = np.full(OBS_DIM, np.inf, dtype=np.float32)
         self.observation_space = spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
 
-        self._client: Optional[int] = None
-        self._robot_id: Optional[int] = None
-        self._obstacle_ids: List[int] = []
-        self._wall_ids: List[int] = []
-        self._goal_xy: Tuple[float, float] = (0.0, 0.0)
+        self._client: int | None = None
+        self._robot_id: int | None = None
+        self._obstacle_ids: list[int] = []
+        self._wall_ids: list[int] = []
+        self._goal_xy: tuple[float, float] = (0.0, 0.0)
         self._prev_action = np.zeros(ACT_DIM, dtype=np.float32)
         self._prev_dist = 0.0
         self._step_count = 0
 
     # -- Gymnasium API --------------------------------------------------
 
-    def _sample_xy(self, wall_half: float, acceptable, attempts: int = 200) -> Tuple[float, float]:
+    def _sample_xy(self, wall_half: float, acceptable, attempts: int = 200) -> tuple[float, float]:
         """Uniform sample inside the arena that satisfies `acceptable`.
 
         Falls back to the last draw rather than looping forever: a small room
@@ -110,7 +112,7 @@ class NavEnv(gym.Env if gym is not None else object):
                 return candidate
         return candidate
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None):
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         if seed is not None:
             self._rng = random.Random(seed)
         if self._client is None:
@@ -140,19 +142,23 @@ class NavEnv(gym.Env if gym is not None else object):
         fixed_goal = tuple(self.goal_override) if self.goal_override else None
 
         def _far_enough(candidate, placed) -> bool:
-            if math.hypot(candidate[0] - spawn_xy[0], candidate[1] - spawn_xy[1]) < self.spawn_clearance:
+            if (
+                math.hypot(candidate[0] - spawn_xy[0], candidate[1] - spawn_xy[1])
+                < self.spawn_clearance
+            ):
                 return False
             if fixed_goal is not None and math.hypot(
                 candidate[0] - fixed_goal[0], candidate[1] - fixed_goal[1]
             ) < self.goal_clearance:
                 return False
             return all(
-                math.hypot(candidate[0] - other[0], candidate[1] - other[1]) >= self.obstacle_spacing
+                math.hypot(candidate[0] - other[0], candidate[1] - other[1])
+                >= self.obstacle_spacing
                 for other in placed
             )
 
         self._obstacle_ids = []
-        placed_xy: List[Tuple[float, float]] = []
+        placed_xy: list[tuple[float, float]] = []
         for _ in range(self.num_obstacles):
             xy = self._sample_xy(wall_half, lambda c: _far_enough(c, placed_xy))
             placed_xy.append(xy)
@@ -186,9 +192,16 @@ class NavEnv(gym.Env if gym is not None else object):
     def step(self, action: np.ndarray):
         import pybullet as p
 
-        action = np.clip(np.asarray(action, dtype=np.float32), self.action_space.low, self.action_space.high)
+        action = np.clip(
+            np.asarray(action, dtype=np.float32), self.action_space.low, self.action_space.high
+        )
         vx, vy, omega = action.tolist()
-        p.resetBaseVelocity(self._robot_id, linearVelocity=[vx, vy, 0], angularVelocity=[0, 0, omega], physicsClientId=self._client)
+        p.resetBaseVelocity(
+            self._robot_id,
+            linearVelocity=[vx, vy, 0],
+            angularVelocity=[0, 0, omega],
+            physicsClientId=self._client,
+        )
         for _ in range(self.sim_steps_per_action):
             p.stepSimulation(physicsClientId=self._client)
 
@@ -229,14 +242,14 @@ class NavEnv(gym.Env if gym is not None else object):
         p.setGravity(0, 0, -9.81, physicsClientId=self._client)
         scene.load_ground_plane(self._client)
 
-    def _robot_pose(self) -> Tuple[float, float, float]:
+    def _robot_pose(self) -> tuple[float, float, float]:
         import pybullet as p
 
         pos, orn = p.getBasePositionAndOrientation(self._robot_id, physicsClientId=self._client)
         yaw = p.getEulerFromQuaternion(orn)[2]
         return pos[0], pos[1], yaw
 
-    def _robot_velocity(self) -> Tuple[float, float, float]:
+    def _robot_velocity(self) -> tuple[float, float, float]:
         import pybullet as p
 
         lin, ang = p.getBaseVelocity(self._robot_id, physicsClientId=self._client)
@@ -250,7 +263,9 @@ class NavEnv(gym.Env if gym is not None else object):
         import pybullet as p
 
         for obs_id in self._obstacle_ids + self._wall_ids:
-            pts = p.getContactPoints(bodyA=self._robot_id, bodyB=obs_id, physicsClientId=self._client)
+            pts = p.getContactPoints(
+                bodyA=self._robot_id, bodyB=obs_id, physicsClientId=self._client
+            )
             if len(pts) > 0:
                 return True
         return False
@@ -263,7 +278,7 @@ class NavEnv(gym.Env if gym is not None else object):
         gdx, gdy = self._goal_xy[0] - x, self._goal_xy[1] - y
         gdist = math.hypot(gdx, gdy)
 
-        obstacle_feats: List[float] = []
+        obstacle_feats: list[float] = []
         dists = []
         for obs_id in self._obstacle_ids:
             opos, _ = p.getBasePositionAndOrientation(obs_id, physicsClientId=self._client)
@@ -277,5 +292,5 @@ class NavEnv(gym.Env if gym is not None else object):
             else:
                 obstacle_feats.extend([0.0, 0.0, 0.0])
 
-        obs = [x, y, math.cos(yaw), math.sin(yaw), gdx, gdy, gdist, vx, vy, omega] + obstacle_feats
+        obs = [x, y, math.cos(yaw), math.sin(yaw), gdx, gdy, gdist, vx, vy, omega, *obstacle_feats]
         return np.array(obs, dtype=np.float32)

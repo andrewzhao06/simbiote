@@ -4,7 +4,13 @@ from simbiote.training.policy_net import ActorCriticMLP, PolicyMeta
 
 
 def make_model(obs_dim=6, act_dim=3):
-    meta = PolicyMeta(obs_dim=obs_dim, act_dim=act_dim, hidden_sizes=(32, 32), act_low=(-1,) * act_dim, act_high=(1,) * act_dim)
+    meta = PolicyMeta(
+        obs_dim=obs_dim,
+        act_dim=act_dim,
+        hidden_sizes=(32, 32),
+        act_low=(-1,) * act_dim,
+        act_high=(1,) * act_dim,
+    )
     return ActorCriticMLP(meta)
 
 
@@ -41,7 +47,7 @@ def test_evaluate_actions_gradients_flow():
     model = make_model()
     obs = torch.randn(8, 6)
     actions = torch.randn(8, 3)
-    log_prob, entropy, value = model.evaluate_actions(obs, actions)
+    log_prob, _entropy, value = model.evaluate_actions(obs, actions)
     loss = -log_prob.mean() + value.mean()
     loss.backward()
     grad_norm = sum(p.grad.abs().sum().item() for p in model.parameters() if p.grad is not None)

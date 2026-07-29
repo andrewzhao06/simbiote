@@ -1,7 +1,7 @@
 # Agentic and LLM control
 
 The implementation lives in `simbiote/agentic/`, with the
-`simbiote/fixtures/hospital_scene_graph.json` fixture. Tests live in
+`simbiote/assets/scenes/hospital_scene_graph.json` fixture. Tests live in
 `tests/agentic/` and run as part of the root `pytest`
 suite. Entry point: `simbiote-agentic` (see `pyproject.toml`).
 

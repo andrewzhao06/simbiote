@@ -6,7 +6,7 @@ import csv
 import math
 from pathlib import Path
 
-from src.models import (
+from simbiote.mapper.models import (
     CameraIntrinsics,
     CaptureBundle,
     Frame,
@@ -138,23 +138,22 @@ def load_capture_bundle(
         raise CaptureValidationError("No usable odometry frames found")
     frames.sort(key=lambda item: item.timestamp)
 
-    imu: list[ImuSample] = []
-    for row in _rows(root / "imu.csv"):
-        imu.append(
-            ImuSample(
-                timestamp=_number(row, "timestamp", "time"),
-                acceleration=(
-                    _number(row, "a_x", "ax"),
-                    _number(row, "a_y", "ay"),
-                    _number(row, "a_z", "az"),
-                ),
-                angular_velocity=(
-                    _number(row, "alpha_x", "gyro_x", "gx"),
-                    _number(row, "alpha_y", "gyro_y", "gy"),
-                    _number(row, "alpha_z", "gyro_z", "gz"),
-                ),
-            )
+    imu: list[ImuSample] = [
+        ImuSample(
+            timestamp=_number(row, "timestamp", "time"),
+            acceleration=(
+                _number(row, "a_x", "ax"),
+                _number(row, "a_y", "ay"),
+                _number(row, "a_z", "az"),
+            ),
+            angular_velocity=(
+                _number(row, "alpha_x", "gyro_x", "gx"),
+                _number(row, "alpha_y", "gyro_y", "gy"),
+                _number(row, "alpha_z", "gyro_z", "gz"),
+            ),
         )
+        for row in _rows(root / "imu.csv")
+    ]
     imu.sort(key=lambda item: item.timestamp)
 
     if len(imu) < len(frames):

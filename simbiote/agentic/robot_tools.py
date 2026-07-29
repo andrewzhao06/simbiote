@@ -22,21 +22,22 @@ free.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from simbiote.agentic.scene_query import SceneGraph
 from simbiote.agentic.tool_schema import TOOL_SPECS, ToolCall
 from simbiote.robot_iface.actions import GripperState, Pose, RobotAction
 
 __all__ = [
-    "SkillResult",
-    "RobotBackend",
-    "StubBackend",
+    "ActionSink",
     "CheckpointBackend",
     "IsaacBackend",
+    "RobotBackend",
     "RobotTools",
-    "ActionSink",
+    "SkillResult",
+    "StubBackend",
 ]
 
 #: Called with each action as the skill emits it, so the session can log live

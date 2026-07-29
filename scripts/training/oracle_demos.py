@@ -18,7 +18,15 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# These scripts are run by path (often under Isaac Sim's bundled interpreter,
+# where the package isn't installed), so put the repo on sys.path. Located by
+# walking up to pyproject.toml rather than by a fixed parent count, which
+# silently breaks the moment the file moves between script subdirectories.
+REPO_ROOT = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file()
+)
+sys.path.insert(0, str(REPO_ROOT))
 
 from simbiote.robot_iface.actions import GripperState, Pose, RobotAction  # noqa: E402
 from simbiote.robot_iface.trajectory import Trajectory, TrajectoryStep  # noqa: E402

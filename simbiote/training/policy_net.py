@@ -17,16 +17,18 @@ control task.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence, Tuple
 
 import torch
 import torch.nn as nn
 from torch.distributions import Normal
 
 
-def _mlp(in_dim: int, out_dim: int, hidden_sizes: Sequence[int], out_activation: nn.Module | None = None) -> nn.Sequential:
+def _mlp(
+    in_dim: int, out_dim: int, hidden_sizes: Sequence[int], out_activation: nn.Module | None = None
+) -> nn.Sequential:
     layers = []
     last = in_dim
     for h in hidden_sizes:
@@ -42,9 +44,9 @@ def _mlp(in_dim: int, out_dim: int, hidden_sizes: Sequence[int], out_activation:
 class PolicyMeta:
     obs_dim: int
     act_dim: int
-    hidden_sizes: Tuple[int, ...] = (128, 128)
-    act_low: Tuple[float, ...] | None = None
-    act_high: Tuple[float, ...] | None = None
+    hidden_sizes: tuple[int, ...] = (128, 128)
+    act_low: tuple[float, ...] | None = None
+    act_high: tuple[float, ...] | None = None
 
 
 class ActorCriticMLP(nn.Module):
@@ -55,13 +57,13 @@ class ActorCriticMLP(nn.Module):
         self.log_std = nn.Parameter(torch.zeros(meta.act_dim) - 0.5)
         self.critic = _mlp(meta.obs_dim, 1, meta.hidden_sizes)
 
-    def forward(self, obs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         mean = self.actor_mean(obs)
         std = self.log_std.exp().expand_as(mean)
         value = self.critic(obs).squeeze(-1)
         return mean, std, value
 
-    def distribution(self, obs: torch.Tensor) -> Tuple[Normal, torch.Tensor]:
+    def distribution(self, obs: torch.Tensor) -> tuple[Normal, torch.Tensor]:
         mean, std, value = self.forward(obs)
         return Normal(mean, std), value
 
@@ -92,7 +94,7 @@ class ActorCriticMLP(nn.Module):
         torch.save({"meta": self.meta, "state_dict": self.state_dict()}, path)
 
     @classmethod
-    def load(cls, path: str | Path, map_location: str = "cpu") -> "ActorCriticMLP":
+    def load(cls, path: str | Path, map_location: str = "cpu") -> ActorCriticMLP:
         checkpoint = torch.load(path, map_location=map_location, weights_only=False)
         model = cls(checkpoint["meta"])
         model.load_state_dict(checkpoint["state_dict"])

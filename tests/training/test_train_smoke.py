@@ -10,8 +10,6 @@ needing pybullet).
 
 from __future__ import annotations
 
-import pytest
-
 from conftest import require_pybullet
 
 

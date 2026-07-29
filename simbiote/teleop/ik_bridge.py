@@ -46,16 +46,15 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from simbiote.robot_iface.actions import GripperState, Pose, RobotAction, neutral_action
 from simbiote.teleop.hand_tracking import (
-    HandLandmarks,
     INDEX_TIP,
     MIDDLE_MCP,
     THUMB_TIP,
     WRIST,
+    HandLandmarks,
 )
 
 # Workspace box the wrist position is mapped into, meters, robot base frame.
@@ -144,7 +143,7 @@ def hand_pitch(pts) -> float:
     return float((mcp[2] - wrist[2]) / palm)
 
 
-class ControlMode(str, Enum):
+class ControlMode(StrEnum):
     """Which part of the robot the hand is currently flying.
 
     One hand can't drive a base and pose an arm at the same time without the
@@ -237,7 +236,7 @@ class IKBridge:
             self.mode = ControlMode.DRIVE
         return self.mode
 
-    def landmarks_to_action(self, landmarks: Optional[HandLandmarks]) -> RobotAction:
+    def landmarks_to_action(self, landmarks: HandLandmarks | None) -> RobotAction:
         if landmarks is None:
             frozen = self._last_action
             action = RobotAction(
@@ -321,10 +320,10 @@ class IKBridge:
 # out of the box for simple callers).
 # ---------------------------------------------------------------------------
 
-_default_bridge: Optional[IKBridge] = None
+_default_bridge: IKBridge | None = None
 
 
-def landmarks_to_action(landmarks: Optional[HandLandmarks]) -> RobotAction:
+def landmarks_to_action(landmarks: HandLandmarks | None) -> RobotAction:
     global _default_bridge
     if _default_bridge is None:
         _default_bridge = IKBridge()

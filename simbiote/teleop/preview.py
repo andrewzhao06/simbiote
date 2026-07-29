@@ -13,22 +13,21 @@ when there's no display attached (see `PreviewWindow.available`).
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 import cv2
 import numpy as np
 
 from simbiote.robot_iface.actions import GripperState, RobotAction
-from simbiote.teleop.hand_tracking import HAND_CONNECTIONS, HandLandmarks, WRIST
+from simbiote.teleop.hand_tracking import HAND_CONNECTIONS, WRIST, HandLandmarks
 from simbiote.teleop.ik_bridge import (
     BASE_DEADZONE,
-    hand_pitch,
     WORKSPACE_X_MAX,
     WORKSPACE_X_MIN,
     WORKSPACE_Y_MAX,
     WORKSPACE_Y_MIN,
     WORKSPACE_Z_MAX,
     WORKSPACE_Z_MIN,
+    hand_pitch,
 )
 
 WINDOW_NAME = "Simbiote Teleop"
@@ -172,7 +171,7 @@ def _draw_workspace_map(panel: np.ndarray, y: int, action: RobotAction) -> int:
 def render_panel(
     height: int,
     action: RobotAction,
-    landmarks: Optional[HandLandmarks],
+    landmarks: HandLandmarks | None,
     fps: float,
     backend: str,
     sink: str,
@@ -293,7 +292,7 @@ class PreviewWindow:
     def compose(
         self,
         frame: np.ndarray,
-        landmarks: Optional[HandLandmarks],
+        landmarks: HandLandmarks | None,
         action: RobotAction,
         fps: float,
     ) -> np.ndarray:
@@ -309,7 +308,7 @@ class PreviewWindow:
     def show(
         self,
         frame: np.ndarray,
-        landmarks: Optional[HandLandmarks],
+        landmarks: HandLandmarks | None,
         action: RobotAction,
         fps: float,
     ) -> bool:

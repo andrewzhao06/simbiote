@@ -12,9 +12,11 @@ Robots > Wheeled Robots > Clearpath > Ridgeback Franka`, or the scripted
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
-from simbiote.robot.robot_config import RIDGEBACK_FRANKA_CONFIG, STAND_IN_CONFIG, RobotConfig, get_config
+from simbiote.robot.robot_config import (
+    RobotConfig,
+    get_config,
+)
 from simbiote.sim_env import pybullet_scene as scene
 
 
@@ -25,10 +27,12 @@ class SpawnedRobot:
     robot_id: int
     physics_client: int
     config: RobotConfig
-    handles: "scene.RobotHandles"
+    handles: scene.RobotHandles
 
 
-def spawn_robot(spec: str | RobotConfig = "stand_in", gui: bool = False, fixed_base: bool = False) -> SpawnedRobot:
+def spawn_robot(
+    spec: str | RobotConfig = "stand_in", gui: bool = False, fixed_base: bool = False
+) -> SpawnedRobot:
     """OpenClaw tool: `spawn_robot(spec)`.
 
     `spec` is either a `RobotConfig` (e.g. `RIDGEBACK_FRANKA_CONFIG`) or a

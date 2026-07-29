@@ -33,7 +33,7 @@ require_pybullet = pytest.mark.skipif(
 
 @pytest.fixture
 def scene():
-    from simbiote.agentic.scene_query import SceneGraph, load_scene
+    from simbiote.agentic.scene_query import load_scene
 
     return load_scene()
 

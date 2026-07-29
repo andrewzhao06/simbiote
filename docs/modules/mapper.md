@@ -1,6 +1,6 @@
 # Scan and map
 
-The mapper implementation is packaged in `src/`.
+The mapper implementation is packaged in `simbiote/mapper/`.
 
 Mapper tests live in `tests/mapper/`. The mapper ingests Stray Scanner captures
 and produces an OpenUSD scene plus a scene-graph sidecar for the simulator and
@@ -35,17 +35,17 @@ source scripts/gb10/env.gb10.sh
 export FACTORYFLOW_MODE=preview
 
 # 1. validate the capture parses and every frame has a depth/confidence pair
-$FF_PY -m src.cli --config config/mapper.gb10.toml \
+$FF_PY -m simbiote.mapper.cli --config config/mapper.gb10.toml \
     ingest UPLOAD_PHONE_SCANS_HERE/<scan>
 
 # 2. scan -> USD
-$FF_PY -m src.cli --config config/mapper.gb10.toml run \
+$FF_PY -m simbiote.mapper.cli --config config/mapper.gb10.toml run \
     --capture UPLOAD_PHONE_SCANS_HERE/<scan> \
     --out artifacts/mapper/out/<scan>.usda
 
 # 3. SCAN_MAP.md 4.5 acceptance test: does it open in Isaac Sim?
 /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-    scripts/gb10/check_mapper_usd.py artifacts/mapper/out/<scan>.usda      # add --gui to watch it
+    scripts/gb10/mapper/check_mapper_usd.py artifacts/mapper/out/<scan>.usda      # add --gui to watch it
 ```
 
 Step 2 writes two files that travel together: `<scan>.usda` (the scene) and
@@ -118,7 +118,7 @@ export FACTORYFLOW_SAM3_COMMAND="$FF_PY $PWD/scripts/gb10/adapters/sam3_detect.p
     --checkpoint {checkpoint} --output {output} \
     --config $PWD/config/mapper.gb10.toml --frames 16"
 
-$FF_PY -m src.cli --config config/mapper.gb10.toml run \
+$FF_PY -m simbiote.mapper.cli --config config/mapper.gb10.toml run \
     --capture UPLOAD_PHONE_SCANS_HERE/<scan> --out artifacts/mapper/out/<scan>.usda
 ```
 
@@ -137,7 +137,7 @@ reliable at), and the extent comes from every reconstructed point lying in that
 plane — SAM 3 alone only sees the floor inside the frames sampled and
 under-covers the room by roughly half.
 
-`scripts/gb10/sam3_labels.py` is the earlier contract stub. It reads only the
+`scripts/gb10/adapters/sam3_labels.py` is the earlier contract stub. It reads only the
 first frame and places every detection at one point (first pose + scene-median
 depth), so object positions are not real. Prefer the adapter above.
 

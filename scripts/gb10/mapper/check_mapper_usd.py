@@ -9,7 +9,7 @@ stops a rigid body in PhysX.
 Run with Isaac Sim's interpreter:
 
     source scripts/gb10/env.gb10.sh
-    $FF_PY scripts/gb10/check_mapper_usd.py artifacts/mapper/out/gb10_walkthrough.usda
+    $FF_PY scripts/gb10/mapper/check_mapper_usd.py artifacts/mapper/out/gb10_walkthrough.usda
 """
 
 from __future__ import annotations
@@ -27,9 +27,8 @@ from isaacsim import SimulationApp  # noqa: E402
 
 simulation_app = SimulationApp({"headless": not args.gui})
 
-from pxr import Gf, Usd, UsdGeom, UsdPhysics  # noqa: E402
-
 import omni.usd  # noqa: E402
+from pxr import Gf, Usd, UsdGeom, UsdPhysics  # noqa: E402
 
 failures: list[str] = []
 notes: list[str] = []

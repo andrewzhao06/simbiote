@@ -75,8 +75,8 @@ def main() -> int:
     image = first_video_frame(args.capture / "rgb.mp4")
     depth = lidar_depth_meters(args.capture / "depth" / f"{frame_id:06d}.png")
 
-    from sam3.model_builder import build_sam3_image_model
     from sam3.model.sam3_image_processor import Sam3Processor
+    from sam3.model_builder import build_sam3_image_model
 
     model = build_sam3_image_model(checkpoint_path=str(args.checkpoint), device="cuda")
     processor = Sam3Processor(model)

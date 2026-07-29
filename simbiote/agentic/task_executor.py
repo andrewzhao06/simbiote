@@ -9,35 +9,34 @@ advance. No LLM call happens per step.
 from __future__ import annotations
 
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable
+from enum import StrEnum
+from typing import Any
 
 from simbiote.agentic.robot_tools import ActionSink, RobotTools, SkillResult
 from simbiote.agentic.tool_schema import ToolCall
 
 __all__ = [
-    "StepStatus",
-    "StepReport",
-    "ExecutionReport",
-    "execute",
     "DEFAULT_SKILL_TIMEOUT_S",
+    "ExecutionReport",
+    "StepReport",
+    "StepStatus",
+    "execute",
 ]
 
 #: A policy that never converges must fail its step rather than hang the demo.
 DEFAULT_SKILL_TIMEOUT_S = 120.0
 
 
-class StepStatus(str, Enum):
+class StepStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     TIMED_OUT = "timed_out"
     BLOCKED = "blocked"  # precondition not met, skill never ran
     SKIPPED = "skipped"  # an earlier step failed
-
-    def __str__(self) -> str:
-        return self.value
 
 
 @dataclass
@@ -103,9 +102,8 @@ def _precondition_error(call: ToolCall, tools: RobotTools) -> str | None:
     elif call.tool == "detach":
         if held is None:
             return "nothing is attached; detach would be a no-op"
-    elif call.tool in ("navigate_to", "pick_up"):
-        if held is not None:
-            return (
+    elif call.tool in ("navigate_to", "pick_up") and held is not None:
+        return (
                 f"a payload ({held!r}) is still attached; use nav_with_payload "
                 "or detach first"
             )

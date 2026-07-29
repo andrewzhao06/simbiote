@@ -6,7 +6,13 @@ from simbiote.training.policy_net import ActorCriticMLP, PolicyMeta
 
 
 def _make_and_save(tmp_path, obs_dim=6, act_dim=3):
-    meta = PolicyMeta(obs_dim=obs_dim, act_dim=act_dim, hidden_sizes=(16, 16), act_low=(-1.0,) * act_dim, act_high=(1.0,) * act_dim)
+    meta = PolicyMeta(
+        obs_dim=obs_dim,
+        act_dim=act_dim,
+        hidden_sizes=(16, 16),
+        act_low=(-1.0,) * act_dim,
+        act_high=(1.0,) * act_dim,
+    )
     model = ActorCriticMLP(meta)
     path = tmp_path / "policy.pt"
     model.save(path)
@@ -51,7 +57,7 @@ def test_export_action_bounds_enforced(tmp_path):
     out-of-range obs that would otherwise push the mean past the bounds."""
     import onnxruntime as ort
 
-    model, ckpt_path = _make_and_save(tmp_path, obs_dim=4, act_dim=2)
+    _model, ckpt_path = _make_and_save(tmp_path, obs_dim=4, act_dim=2)
     onnx_path = export_policy(ckpt_path, tmp_path / "clamped.onnx", fmt="onnx")
 
     obs = (np.random.RandomState(1).uniform(-1, 1, size=(20, 4)) * 50).astype(np.float32)

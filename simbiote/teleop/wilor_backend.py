@@ -19,25 +19,25 @@ convention MediaPipe uses -- 0 wrist, 1-4 thumb, 5-8 index, 9-12 middle,
 
 Model weights are the ones already staged in /home/dell/AI/models/wilor;
 override with SIMBIOTE_WILOR_DIR. The MANO pickle must be the chumpy-free
-copy produced by scripts/gb10/dechumpify_mano.py (chumpy does not import on
-Python 3.12), which lives in assets/mano/ by default.
+copy produced by scripts/gb10/teleop/dechumpify_mano.py (chumpy does not import on
+Python 3.12), which lives in simbiote/assets/mano/ by default.
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
-from simbiote.teleop.hand_tracking import HandLandmarks, NUM_LANDMARKS, WRIST
+from simbiote import assets
+from simbiote.teleop.hand_tracking import NUM_LANDMARKS, WRIST, HandLandmarks
 
 DEFAULT_WILOR_DIR = Path(os.environ.get("SIMBIOTE_WILOR_DIR", "/home/dell/AI/models/wilor"))
 DEFAULT_MANO_DIR = Path(
     os.environ.get(
         "SIMBIOTE_MANO_DIR",
-        str(Path(__file__).resolve().parents[2] / "assets" / "mano"),
+        str(assets.MANO_DIR),
     )
 )
 
@@ -59,9 +59,9 @@ class WiLoRHandTracker:
 
     def __init__(
         self,
-        wilor_dir: Optional[Path] = None,
-        mano_dir: Optional[Path] = None,
-        device: Optional[str] = None,
+        wilor_dir: Path | None = None,
+        mano_dir: Path | None = None,
+        device: str | None = None,
         min_detection_confidence: float = 0.3,
         detect_interval: int = DEFAULT_DETECT_INTERVAL,
         rescale_factor: float = 2.0,
@@ -93,7 +93,7 @@ class WiLoRHandTracker:
         self._detector = YOLO(str(self.wilor_dir / "pretrained_models" / "detector.pt"))
 
         self._frame_index = 0
-        self._last_box: Optional[np.ndarray] = None  # xyxy in full-image pixels
+        self._last_box: np.ndarray | None = None  # xyxy in full-image pixels
         self._last_is_right: float = 1.0
 
     # -- setup ---------------------------------------------------------------
@@ -108,8 +108,9 @@ class WiLoRHandTracker:
             (detector, "WiLoR hand detector"),
             (
                 mano,
-                "chumpy-free MANO pickle -- generate it with "
-                "`python scripts/gb10/dechumpify_mano.py --out assets/mano/MANO_RIGHT.pkl`",
+                ("chumpy-free MANO pickle -- generate it with "
+                "`python scripts/gb10/teleop/dechumpify_mano.py "
+                "--out simbiote/assets/mano/MANO_RIGHT.pkl`"),
             ),
         ]:
             if not path.exists():
@@ -148,7 +149,7 @@ class WiLoRHandTracker:
 
     # -- detection -----------------------------------------------------------
 
-    def _detect_box(self, img_rgb: np.ndarray) -> Optional[tuple[np.ndarray, float]]:
+    def _detect_box(self, img_rgb: np.ndarray) -> tuple[np.ndarray, float] | None:
         """Run YOLO and return (xyxy box, is_right) for the best hand, or None."""
 
         detections = self._detector(
@@ -178,7 +179,7 @@ class WiLoRHandTracker:
 
     # -- inference -----------------------------------------------------------
 
-    def get_hand_landmarks(self, frame: np.ndarray) -> Optional[HandLandmarks]:
+    def get_hand_landmarks(self, frame: np.ndarray) -> HandLandmarks | None:
         """frame: a BGR image as read from camera_source.FrameSource.read().
 
         Returns None if no hand is found in this frame.
@@ -192,7 +193,9 @@ class WiLoRHandTracker:
 
         # Detect on an interval; reuse the tracked box on the frames between,
         # and always fall back to a fresh detection if tracking has no box.
-        due_for_detection = (self._frame_index % self.detect_interval == 0) or self._last_box is None
+        due_for_detection = (
+            self._frame_index % self.detect_interval == 0
+        ) or self._last_box is None
         self._frame_index += 1
 
         if due_for_detection:
@@ -265,7 +268,7 @@ class WiLoRHandTracker:
     def close(self) -> None:
         self._last_box = None
 
-    def __enter__(self) -> "WiLoRHandTracker":
+    def __enter__(self) -> WiLoRHandTracker:
         return self
 
     def __exit__(self, *exc) -> None:

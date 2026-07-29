@@ -18,8 +18,12 @@ def _clean_sessions(tmp_path, monkeypatch):
 
 def test_start_log_export_session():
     demo_logger.start_session("sess-1", source="teleop", task="nav")
-    demo_logger.log_action(RobotAction(base_velocity=(1, 0, 0)), source="teleop", observation=[0.1, 0.2])
-    demo_logger.log_action(RobotAction(base_velocity=(0, 1, 0)), source="teleop", observation=[0.3, 0.4])
+    demo_logger.log_action(
+        RobotAction(base_velocity=(1, 0, 0)), source="teleop", observation=[0.1, 0.2]
+    )
+    demo_logger.log_action(
+        RobotAction(base_velocity=(0, 1, 0)), source="teleop", observation=[0.3, 0.4]
+    )
 
     traj = demo_logger.export_trajectory("sess-1")
     assert traj.session_id == "sess-1"

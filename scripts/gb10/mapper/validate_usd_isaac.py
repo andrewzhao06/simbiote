@@ -4,25 +4,25 @@ This is Teammate 1's §4.5 acceptance test and the thing Step 2's `validate_map(
 is coded against: the stage opens in Isaac Sim, the scale is right, there is at
 least one navigable-floor region, and at least one graspable object.
 
-Run it through `scripts/gb10/validate_usd_isaac.sh`, which enforces the memory
+Run it through `scripts/gb10/mapper/validate_usd_isaac.sh`, which enforces the memory
 budget first. Booting this alongside a resident LLM is what took the box down on
 2026-07-26 — GB10 has no separate VRAM, so an Isaac Sim stage and a vLLM server
 draw from the same 128 GB pool.
 
-    scripts/gb10/validate_usd_isaac.sh /home/dell/factoryflow/stage/proxy-demo.usda
+    scripts/gb10/mapper/validate_usd_isaac.sh /home/dell/factoryflow/stage/proxy-demo.usda
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
+from pathlib import Path
 
 RELEASE = "/home/dell/IsaacSim/_build/linux-aarch64/release"
 # The lightweight headless experience. Deliberately NOT isaacsim.exp.full.kit --
 # "Full" boots the RTX renderer and the whole GUI extension set.
-EXPERIENCE = os.path.join(RELEASE, "apps", "isaacsim.exp.base.python.kit")
+EXPERIENCE = str(Path(RELEASE) / "apps" / "isaacsim.exp.base.python.kit")
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,7 +39,7 @@ def parse_args() -> argparse.Namespace:
 
 def check_stage(stage) -> dict:
     """Collect the Step 2 contract facts from an opened stage."""
-    from pxr import Usd, UsdGeom, UsdPhysics
+    from pxr import UsdGeom, UsdPhysics
 
     report: dict = {"errors": [], "warnings": []}
 
@@ -113,8 +113,8 @@ def check_stage(stage) -> dict:
 
 def main() -> int:
     args = parse_args()
-    usd_path = os.path.abspath(args.usd)
-    if not os.path.isfile(usd_path):
+    usd_path = str(Path(args.usd).resolve())
+    if not Path(usd_path).is_file():
         print(f"FAIL: no such file: {usd_path}", file=sys.stderr)
         return 2
 
@@ -149,7 +149,10 @@ def main() -> int:
     print(f"metersPerUnit    : {report['meters_per_unit']}")
     print(f"upAxis           : {report['up_axis']}")
     print(f"prims            : {report['prim_count']}")
-    print(f"navigable floor  : {len(report['navigable_floor_prims'])} {report['navigable_floor_prims']}")
+    print(
+        f"navigable floor  : {len(report['navigable_floor_prims'])} "
+        f"{report['navigable_floor_prims']}"
+    )
     print(f"graspable objects: {len(report['graspable_prims'])} {report['graspable_prims']}")
     print(f"colliders        : {len(report['collision_prims'])}")
 
@@ -159,7 +162,7 @@ def main() -> int:
         print(f"ERROR {error}")
 
     if args.json_out:
-        with open(args.json_out, "w", encoding="utf-8") as handle:
+        with Path(args.json_out).open("w", encoding="utf-8") as handle:
             json.dump(report, handle, indent=2)
         print(f"\nreport written to {args.json_out}")
 

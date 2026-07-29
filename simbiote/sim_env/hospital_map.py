@@ -28,9 +28,10 @@ from __future__ import annotations
 
 import heapq
 import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import ClassVar
 
 import numpy as np
 
@@ -58,7 +59,7 @@ GRID_RESOLUTION = 0.10  # metres per cell
 
 # Where the scene graph's location ids actually are inside hospital.usd.
 #
-# `simbiote/fixtures/hospital_scene_graph.json` is a hand-written stand-in for
+# `simbiote/assets/scenes/hospital_scene_graph.json` is a hand-written stand-in for
 # Teammate 1's output and its poses span about 14 x 24 m around the origin --
 # they are a *layout*, not hospital.usd coordinates. Dropping them onto the
 # real building puts every location in the same room, or inside a wall.
@@ -69,7 +70,7 @@ GRID_RESOLUTION = 0.10  # metres per cell
 # building. Each was chosen as a local maximum of the clearance field within
 # the component reachable from SPAWN, then checked: all 30 ordered pairs plan,
 # 10-74 m apart. Clearances in metres are noted per entry.
-HOSPITAL_LOCATIONS: Dict[str, Tuple[float, float]] = {
+HOSPITAL_LOCATIONS: dict[str, tuple[float, float]] = {
     "corridor": (-2.74, 10.70),       # 2.12 -- main east-west corridor, centre
     "supply_room": (-26.74, 18.70),   # 2.68 -- west wing, north
     "room_1": (13.26, 31.20),         # 2.42 -- north-east wing
@@ -92,13 +93,13 @@ class GridSpec:
     width: int
     height: int
 
-    def to_cell(self, x: float, y: float) -> Tuple[int, int]:
+    def to_cell(self, x: float, y: float) -> tuple[int, int]:
         return (
             int((x - self.origin_x) / self.resolution),
             int((y - self.origin_y) / self.resolution),
         )
 
-    def to_world(self, ix: int, iy: int) -> Tuple[float, float]:
+    def to_world(self, ix: int, iy: int) -> tuple[float, float]:
         # Cell centre, not corner -- a path that returns corners drifts half a
         # cell toward the origin at every waypoint.
         return (
@@ -111,8 +112,8 @@ class GridSpec:
 
 
 def _world_bounds_in_band(
-    usd_path: str, z_band: Tuple[float, float]
-) -> Tuple[List[Tuple[float, float, float, float]], Tuple[float, float, float, float]]:
+    usd_path: str, z_band: tuple[float, float]
+) -> tuple[list[tuple[float, float, float, float]], tuple[float, float, float, float]]:
     """Axis-aligned XY footprints of every prim intersecting the height band,
     plus the XY extent of the floor geometry.
 
@@ -132,7 +133,7 @@ def _world_bounds_in_band(
     )
 
     z_lo, z_hi = z_band
-    footprints: List[Tuple[float, float, float, float]] = []
+    footprints: list[tuple[float, float, float, float]] = []
     floor_min_x = floor_min_y = math.inf
     floor_max_x = floor_max_y = -math.inf
 
@@ -267,7 +268,7 @@ class HospitalMap:
         self.robot_radius = robot_radius
         # `raw` is the true geometry; `blocked` is what the planner uses.
         self.raw = occupied
-        inflate_cells = int(round(robot_radius / spec.resolution))
+        inflate_cells = round(robot_radius / spec.resolution)
         self.blocked = _inflate(occupied, inflate_cells)
 
     # -- construction -------------------------------------------------------
@@ -277,15 +278,15 @@ class HospitalMap:
         cls,
         usd_path: str = DEFAULT_HOSPITAL_USD,
         resolution: float = GRID_RESOLUTION,
-        z_band: Tuple[float, float] = Z_BAND,
+        z_band: tuple[float, float] = Z_BAND,
         robot_radius: float = ROBOT_RADIUS,
-    ) -> "HospitalMap":
+    ) -> HospitalMap:
         footprints, floor = _world_bounds_in_band(usd_path, z_band)
         min_x, min_y, max_x, max_y = floor
         pad = 1.0
         origin_x, origin_y = min_x - pad, min_y - pad
-        width = int(math.ceil((max_x - min_x + 2 * pad) / resolution))
-        height = int(math.ceil((max_y - min_y + 2 * pad) / resolution))
+        width = math.ceil((max_x - min_x + 2 * pad) / resolution)
+        height = math.ceil((max_y - min_y + 2 * pad) / resolution)
         spec = GridSpec(origin_x, origin_y, resolution, width, height)
 
         # Start fully blocked, carve out the floor, then stamp obstacles back
@@ -311,11 +312,11 @@ class HospitalMap:
     def load_or_build(
         cls,
         usd_path: str = DEFAULT_HOSPITAL_USD,
-        cache_path: Optional[Path] = None,
+        cache_path: Path | None = None,
         resolution: float = GRID_RESOLUTION,
-        z_band: Tuple[float, float] = Z_BAND,
+        z_band: tuple[float, float] = Z_BAND,
         robot_radius: float = ROBOT_RADIUS,
-    ) -> "HospitalMap":
+    ) -> HospitalMap:
         cache_path = Path(
             cache_path
             or Path(__file__).resolve().parent.parent.parent
@@ -372,7 +373,7 @@ class HospitalMap:
         """
         cx, cy = self.spec.to_cell(x, y)
         max_cells = int(limit / self.spec.resolution)
-        for radius in range(0, max_cells + 1):
+        for radius in range(max_cells + 1):
             x0, x1 = max(cx - radius, 0), min(cx + radius + 1, self.spec.width)
             y0, y1 = max(cy - radius, 0), min(cy + radius + 1, self.spec.height)
             window = self.raw[x0:x1, y0:y1]
@@ -383,7 +384,9 @@ class HospitalMap:
                 return float(np.min(np.hypot(dx, dy)))
         return limit
 
-    def nearest_free(self, x: float, y: float, max_radius: float = 6.0) -> Optional[Tuple[float, float]]:
+    def nearest_free(
+        self, x: float, y: float, max_radius: float = 6.0
+    ) -> tuple[float, float] | None:
         """Closest planner-free point to (x, y).
 
         Scene-graph anchors are authored by hand and land inside a bed or a
@@ -406,7 +409,7 @@ class HospitalMap:
 
     # -- planning -----------------------------------------------------------
 
-    _NEIGHBOURS = [
+    _NEIGHBOURS: ClassVar[list[tuple[int, int, float]]] = [
         (1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0),
         (1, 1, math.sqrt(2)), (1, -1, math.sqrt(2)),
         (-1, 1, math.sqrt(2)), (-1, -1, math.sqrt(2)),
@@ -414,10 +417,10 @@ class HospitalMap:
 
     def plan(
         self,
-        start: Tuple[float, float],
-        goal: Tuple[float, float],
+        start: tuple[float, float],
+        goal: tuple[float, float],
         simplify: bool = True,
-    ) -> Optional[List[Tuple[float, float]]]:
+    ) -> list[tuple[float, float]] | None:
         """A* from `start` to `goal`, returned as world-space waypoints.
 
         Returns None when the goal is unreachable, rather than a partial path
@@ -437,7 +440,7 @@ class HospitalMap:
         blocked = self.blocked
         width, height = self.spec.width, self.spec.height
 
-        def heuristic(cell: Tuple[int, int]) -> float:
+        def heuristic(cell: tuple[int, int]) -> float:
             dx = abs(cell[0] - goal_cell[0])
             dy = abs(cell[1] - goal_cell[1])
             # Octile: admissible for 8-connected grids where a Euclidean
@@ -445,7 +448,7 @@ class HospitalMap:
             return (dx + dy) + (math.sqrt(2) - 2) * min(dx, dy)
 
         open_heap = [(heuristic(start_cell), 0.0, start_cell)]
-        came_from: Dict[Tuple[int, int], Tuple[int, int]] = {}
+        came_from: dict[tuple[int, int], tuple[int, int]] = {}
         cost = {start_cell: 0.0}
         closed = set()
 
@@ -486,7 +489,7 @@ class HospitalMap:
         points = [self.spec.to_world(*cell) for cell in cells]
         return self.simplify(points) if simplify else points
 
-    def _line_is_clear(self, a: Tuple[float, float], b: Tuple[float, float]) -> bool:
+    def _line_is_clear(self, a: tuple[float, float], b: tuple[float, float]) -> bool:
         distance = math.hypot(b[0] - a[0], b[1] - a[1])
         samples = max(int(distance / (self.spec.resolution * 0.5)), 1)
         for i in range(samples + 1):
@@ -495,7 +498,7 @@ class HospitalMap:
                 return False
         return True
 
-    def simplify(self, points: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:
+    def simplify(self, points: Sequence[tuple[float, float]]) -> list[tuple[float, float]]:
         """String-pull the grid path down to the corners that matter.
 
         A raw A* path is one waypoint per 0.1 m cell, which would make the nav
@@ -517,13 +520,13 @@ class HospitalMap:
 
     def ascii_map(
         self,
-        marks: Optional[Dict[str, Tuple[float, float]]] = None,
-        path: Optional[Iterable[Tuple[float, float]]] = None,
+        marks: dict[str, tuple[float, float]] | None = None,
+        path: Iterable[tuple[float, float]] | None = None,
         step: int = 8,
     ) -> str:
         """Coarse text render. `step` is in cells, so 8 at 0.1 m is 0.8 m/char."""
         rows = []
-        overlay: Dict[Tuple[int, int], str] = {}
+        overlay: dict[tuple[int, int], str] = {}
         if path:
             for x, y in path:
                 cell = self.spec.to_cell(x, y)

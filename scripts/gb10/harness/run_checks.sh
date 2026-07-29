@@ -103,7 +103,10 @@ echo "PASS ${pass}  FAIL ${fail}  BLOCKED ${blocked}  SKIP ${skip}"
 echo "report: ${report}"
 echo "logs:   ${log_dir}/"
 
-ln -sfn "${report}" "${REPORTS_DIR}/latest.json"
+# Relative, and made from inside REPORTS_DIR: an absolute link points at one
+# machine's checkout path and is dead in every other clone of this repo
+# (latest.json is committed).
+ln -sfn "$(basename "${report}")" "${REPORTS_DIR}/latest.json"
 
 (( fail > 0 )) && exit 1
 if [[ "${FAIL_ON_BLOCKED:-0}" == "1" ]] && (( blocked > 0 )); then

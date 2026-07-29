@@ -36,7 +36,7 @@ from simbiote.agentic.task_executor import ExecutionReport, StepReport, StepStat
 from simbiote.agentic.tool_schema import ToolCall
 from simbiote.robot_iface.actions import RobotAction
 
-__all__ = ["SessionResult", "run_session", "main"]
+__all__ = ["SessionResult", "main", "run_session"]
 
 #: Best-measured nav policy for hospital traversal. `nav_bc.pt` (behavioural
 #: cloning) beats both PPO variants here -- 16/20 location pairs against
@@ -76,7 +76,7 @@ def run_session(
     session_id: str | None = None,
     stage: str | os.PathLike[str] | None = None,
     timeout_s: float = task_executor.DEFAULT_SKILL_TIMEOUT_S,
-    on_step: "object | None" = None,
+    on_step: object | None = None,
 ) -> SessionResult:
     """Parse, execute, and log one natural-language instruction."""
     session_id = session_id or demo_logger.new_session_id("agentic")
@@ -247,7 +247,9 @@ def _run_preflight(llm: LLMBackend, args: argparse.Namespace) -> bool:
         return True
 
     profile = resolve_profile(args.llm_profile)
-    timeout = args.preflight_timeout if args.preflight_timeout is not None else profile.ready_timeout_s
+    timeout = (
+        args.preflight_timeout if args.preflight_timeout is not None else profile.ready_timeout_s
+    )
     print(
         f"preflight: waiting up to {timeout:.0f}s for {profile.model} "
         f"(~{profile.footprint_gb:.0f} GB, resident={profile.resident}) at {profile.base_url}",
@@ -337,7 +339,9 @@ def main(argv: list[str] | None = None) -> int:
 
     traj_path = demo_logger.session_path(result.session_id, args.stage)
     print(f"\nsession:    {result.session_id}")
-    print(f"planned by: {result.llm.get('served_by')}" + ("  (DEGRADED)" if result.degraded else ""))
+    print(
+        f"planned by: {result.llm.get('served_by')}" + ("  (DEGRADED)" if result.degraded else "")
+    )
     print(f"trajectory: {traj_path}  ({len(result.trajectory or [])} actions)")
 
     if result.ok:

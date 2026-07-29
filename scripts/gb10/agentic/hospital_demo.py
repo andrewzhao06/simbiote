@@ -36,9 +36,16 @@ import time
 from pathlib import Path
 
 sys.stdout.reconfigure(line_buffering=True)
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+# These scripts are run by path (often under Isaac Sim's bundled interpreter,
+# where the package isn't installed), so put the repo on sys.path. Located by
+# walking up to pyproject.toml rather than by a fixed parent count, which
+# silently breaks the moment the file moves between script subdirectories.
+REPO_ROOT = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file()
+)
+sys.path.insert(0, str(REPO_ROOT))
 
-REPO = Path(__file__).resolve().parents[3]
 
 #: The canned commands `--interactive` offers. Edit this list to change the
 #: menu -- it is the only place the demo's instructions are written down.
@@ -96,9 +103,12 @@ parser.add_argument(
 )
 parser.add_argument("--width", type=int, default=1280)
 parser.add_argument("--height", type=int, default=720)
-parser.add_argument("--nav-checkpoint", default=str(REPO / "checkpoints" / "nav_bc.pt"))
-parser.add_argument("--scene", default=str(REPO / "simbiote" / "fixtures" / "hospital_scene_graph.json"))
-parser.add_argument("--stage", default=str(REPO / "stage"))
+parser.add_argument("--nav-checkpoint", default=str(REPO_ROOT / "checkpoints" / "nav_bc.pt"))
+parser.add_argument(
+    "--scene",
+    default=str(REPO_ROOT / "simbiote" / "assets" / "scenes" / "hospital_scene_graph.json"),
+)
+parser.add_argument("--stage", default=str(REPO_ROOT / "stage"))
 args = parser.parse_args()
 
 if not args.instructions and not args.interactive:
@@ -148,7 +158,7 @@ from simbiote.agentic.scene_query import load_scene  # noqa: E402
 scene = load_scene(args.scene)
 robot = IsaacBackend(
     nav_checkpoint=args.nav_checkpoint,
-    grasp_checkpoint=str(REPO / "checkpoints" / "grasp_bc.pt"),
+    grasp_checkpoint=str(REPO_ROOT / "checkpoints" / "grasp_bc.pt"),
     hospital=hospital,
 )
 
@@ -179,7 +189,7 @@ def run_session_pumped(instruction: str):
     def target() -> None:
         try:
             box["result"] = run_session(instruction, scene, llm, robot, stage=args.stage)
-        except BaseException as exc:  # noqa: BLE001 - re-raised on the main thread
+        except BaseException as exc:
             box["error"] = exc
 
     worker = threading.Thread(target=target, name="session", daemon=True)

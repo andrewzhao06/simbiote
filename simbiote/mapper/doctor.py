@@ -9,7 +9,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from src.config import MapperConfig
+from simbiote.mapper.config import MapperConfig
 
 
 @dataclass(frozen=True, slots=True)

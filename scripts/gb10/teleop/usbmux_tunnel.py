@@ -24,13 +24,14 @@ itself into a raw pipe to the device port -- so after a successful Connect, the
 same socket is just bytes in both directions.
 
 Usage:
-    python scripts/gb10/usbmux_tunnel.py --device-port 4747
+    python scripts/gb10/teleop/usbmux_tunnel.py --device-port 4747
     # then: curl -sI http://127.0.0.1:4747/video   (or point teleop at it)
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import plistlib
 import socket
 import socketserver
@@ -108,7 +109,10 @@ def pick_device(udid: str | None = None) -> tuple[int, str]:
         properties = device.get("Properties", {})
         if udid is None or properties.get("SerialNumber") == udid:
             return int(device["DeviceID"]), properties.get("SerialNumber", "?")
-    raise RuntimeError(f"no device matching udid {udid!r}; found {[d['Properties'].get('SerialNumber') for d in devices]}")
+    raise RuntimeError(
+        f"no device matching udid {udid!r}; found "
+        f"{[d['Properties'].get('SerialNumber') for d in devices]}"
+    )
 
 
 def open_device_port(device_id: int, port: int) -> socket.socket:
@@ -147,11 +151,9 @@ def _pump(src: socket.socket, dst: socket.socket) -> None:
     except OSError:
         pass
     finally:
-        for s in (src, dst):
-            try:
-                s.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
+        for sock in (src, dst):
+            with contextlib.suppress(OSError):
+                sock.shutdown(socket.SHUT_RDWR)
 
 
 class _Handler(socketserver.BaseRequestHandler):
@@ -161,7 +163,7 @@ class _Handler(socketserver.BaseRequestHandler):
     def handle(self) -> None:
         try:
             device = open_device_port(self.device_id, self.device_port)
-        except Exception as exc:  # noqa: BLE001 - report and drop this connection only
+        except Exception as exc:
             print(f"[usbmux] connection refused: {exc}", file=sys.stderr)
             return
         # MJPEG is a long-lived stream in one direction plus a short request in
@@ -179,8 +181,12 @@ class _Server(socketserver.ThreadingTCPServer):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--device-port", type=int, default=4747, help="Port on the iPhone (DroidCam: 4747).")
-    parser.add_argument("--local-port", type=int, default=0, help="Local port (default: same as --device-port).")
+    parser.add_argument(
+        "--device-port", type=int, default=4747, help="Port on the iPhone (DroidCam: 4747)."
+    )
+    parser.add_argument(
+        "--local-port", type=int, default=0, help="Local port (default: same as --device-port)."
+    )
     parser.add_argument("--local-host", default="127.0.0.1")
     parser.add_argument("--udid", default=None, help="Pick a specific device by UDID.")
     parser.add_argument("--list", action="store_true", help="List tethered devices and exit.")

@@ -438,7 +438,7 @@ simbiote/
 │   ├── retrain.py         — ingest_demo()/finetune_policy() OpenClaw tool pair (below)
 │   └── distill_student.py — vision-student stub, GB10-only stretch, not wired up tonight
 ├── demo_logger.py       — shared log_action()/export_trajectory() session logger for Steps 3 & 4
-└── assets/{robots,wheelchair}/*.urdf — stand-in URDFs for tonight's PyBullet testing
+└── simbiote/assets/{robots,wheelchair}/*.urdf — stand-in URDFs for PyBullet testing
 ```
 
 **Trajectory schema — resolved (§5.7/§6.7/§6b.7's "coordinate as a group" item):**
@@ -494,7 +494,7 @@ Location/object name → world position is a placeholder registry (`DEFAULT_LOCA
 - The 3-DOF stand-in arm can't track a full 6-DOF end-effector pose (over-constrained) — `grasp_task.py`'s IK is **position-only** tonight (`p.calculateInverseKinematics` without `targetOrientation`). The real 7-DOF Franka arm tomorrow has the DOF to track orientation too; re-enable it then if the grasp task wants it.
 - `p.calculateInverseKinematics`'s result array is indexed by **movable joints only**, not raw URDF joint indices — `RobotHandles` now exposes `dof_joint_indices` + an `ik_angle()` lookup to avoid mis-indexing; worth double-checking this maps cleanly onto Isaac Lab's own IK helpers tomorrow, which may not have the same indexing quirk.
 - `GraspEnv` spawns a small static table under the graspable object (`pybullet_scene.spawn_table`) — without it the object free-falls before the arm can reach it. `hospital.usd` presumably already has real support surfaces, so this is likely PyBullet-stand-in-only and can probably be dropped tomorrow.
-- **PyBullet has no official Windows wheel for Python 3.13** (this repo's system Python). Tests that need it use a `require_pybullet` fixture (`tests/conftest.py`) that skips gracefully if the import fails, so the suite is honest about coverage on a bare Windows/3.13 setup. For full local validation, a `micromamba`/conda env with Python 3.11 (which does have `pybullet` win-64 wheels via conda-forge) was used — see `tools/pbenv/`. On the GB10's Linux/aarch64 DGX OS this isn't an issue at all; standard `pip install pybullet` (or just skip straight to Isaac Sim) works.
+- **PyBullet has no official Windows wheel for Python 3.13** (this repo's system Python). Tests that need it use a `require_pybullet` marker (`conftest.py` at the repo root) that skips gracefully if the import fails, so the suite is honest about coverage on a bare Windows/3.13 setup. For full local validation, a `micromamba`/conda env with Python 3.11 (which does have `pybullet` win-64 wheels via conda-forge) was used — see `tools/pbenv/`. On the GB10's Linux/aarch64 DGX OS this isn't an issue at all; standard `pip install pybullet` (or just skip straight to Isaac Sim) works.
 - PyTorch's newer `torch.onnx.export` Dynamo path needs `onnxscript`, which isn't pulled in automatically — added to `requirements.txt` explicitly.
 
 **Test suite:** `tests/` has one file per module (67 tests total) plus `test_train_smoke.py` (CLI smoke tests for `train_nav`/`train_grasp`/`play`/`export_policy`) and `test_skills.py` (the navigate_to/pick_up skill API end-to-end). Two are marked `@pytest.mark.slow` (real PPO convergence checks against a live PyBullet env and against `Pendulum-v1`) and are excluded by default — run `pytest -q -m slow` to include them.

@@ -17,7 +17,7 @@ from simbiote.agentic.tool_schema import (
     validate_calls,
 )
 
-__all__ = ["ParseError", "parse_instruction", "build_system_prompt"]
+__all__ = ["ParseError", "build_system_prompt", "parse_instruction"]
 
 
 class ParseError(RuntimeError):

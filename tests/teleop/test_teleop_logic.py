@@ -14,17 +14,19 @@ import pytest
 from simbiote import demo_logger
 from simbiote.robot_iface.actions import GripperState, Pose, RobotAction, neutral_action
 from simbiote.teleop.hand_tracking import (
-    HandLandmarks,
     INDEX_TIP,
     MIDDLE_MCP,
     NUM_LANDMARKS,
     THUMB_TIP,
     WRIST,
+    HandLandmarks,
 )
 from simbiote.teleop.ik_bridge import ControlMode, IKBridge
 
 
-def make_landmarks(wrist_xy=(0.5, 0.5), palm_scale=0.15, pinch_ratio=1.0, pitch=0.0) -> HandLandmarks:
+def make_landmarks(
+    wrist_xy=(0.5, 0.5), palm_scale=0.15, pinch_ratio=1.0, pitch=0.0
+) -> HandLandmarks:
     """Synthetic landmarks. `pitch` is the signed hand tilt IKBridge reads:
     negative = fingers toward the camera, positive = folded back away from it.
     """
@@ -101,7 +103,7 @@ def test_demo_logger_export_unknown_session_raises(tmp_path):
 def test_hand_centered_produces_near_zero_base_velocity():
     bridge = IKBridge()
     action = bridge.landmarks_to_action(make_landmarks(wrist_xy=(0.5, 0.5)))
-    vx, vy, omega = action.base_velocity
+    vx, _vy, omega = action.base_velocity
     assert abs(vx) < 1e-6
     assert abs(omega) < 1e-6
 

@@ -13,13 +13,13 @@ the exact backbone -- swap in Theia/ResNet-50 on the GB10 by changing
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional, Tuple
 
 import torch
 import torch.nn as nn
 
-from simbiote.training.policy_net import ActorCriticMLP, PolicyMeta
+from simbiote.training.policy_net import ActorCriticMLP
 
 DEFAULT_CHECKPOINT_DIR = Path(__file__).resolve().parent.parent.parent / "checkpoints"
 
@@ -40,7 +40,9 @@ class VisionStudent(nn.Module):
             nn.Conv2d(32, 32, kernel_size=3, stride=2, padding=1), nn.ReLU(),
             nn.AdaptiveAvgPool2d(4),
         )
-        self.head = nn.Sequential(nn.Flatten(), nn.Linear(32 * 4 * 4, 128), nn.ReLU(), nn.Linear(128, act_dim))
+        self.head = nn.Sequential(
+            nn.Flatten(), nn.Linear(32 * 4 * 4, 128), nn.ReLU(), nn.Linear(128, act_dim)
+        )
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         return self.head(self.conv(images))
@@ -49,11 +51,11 @@ class VisionStudent(nn.Module):
 def distill(
     teacher: ActorCriticMLP,
     student: VisionStudent,
-    render_fn: Callable[[int], Tuple[torch.Tensor, torch.Tensor]],
+    render_fn: Callable[[int], tuple[torch.Tensor, torch.Tensor]],
     steps: int = 200,
     batch_size: int = 16,
     lr: float = 1e-3,
-    out_path: Optional[str | Path] = None,
+    out_path: str | Path | None = None,
 ) -> Path:
     """`render_fn(batch_size) -> (images, privileged_obs)` is provided by the
     caller (a rollout/replay source that can render both a camera frame and
@@ -79,7 +81,14 @@ def distill(
 
     out_path = Path(out_path) if out_path else DEFAULT_CHECKPOINT_DIR / "vision_student.pt"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save({"act_dim": student.head[-1].out_features, "image_size": student.image_size, "state_dict": student.state_dict()}, out_path)
+    torch.save(
+        {
+            "act_dim": student.head[-1].out_features,
+            "image_size": student.image_size,
+            "state_dict": student.state_dict(),
+        },
+        out_path,
+    )
     return out_path
 
 

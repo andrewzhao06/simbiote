@@ -20,8 +20,7 @@ from __future__ import annotations
 
 import math
 import random
-from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -32,11 +31,12 @@ except ImportError:  # pragma: no cover
     gym = None
     spaces = None
 
+from simbiote import assets
 from simbiote.robot.robot_config import STAND_IN_CONFIG, RobotConfig
 from simbiote.sim_env import grasp_attach
 from simbiote.sim_env import pybullet_scene as scene
 
-WHEELCHAIR_URDF = str(Path(__file__).resolve().parent.parent.parent / "assets" / "wheelchair" / "wheelchair.urdf")
+WHEELCHAIR_URDF = str(assets.WHEELCHAIR_URDF)
 
 # [robot_x, robot_y, cos(yaw), sin(yaw), robot_vx, robot_vy, robot_omega,
 #  chair_x, chair_y, chair_roll, chair_pitch, tilt_mag,
@@ -50,7 +50,7 @@ TIP_OVER_TILT_RAD = 0.5  # ~28.6 deg -- treated as a failed co-nav episode
 class WheelchairEnv(gym.Env if gym is not None else object):
     """Push/guide an already-attached wheelchair to a goal without tipping it."""
 
-    metadata = {"render_modes": ["human"]}
+    metadata: ClassVar[dict] = {"render_modes": ["human"]}
 
     def __init__(
         self,
@@ -62,8 +62,8 @@ class WheelchairEnv(gym.Env if gym is not None else object):
         tilt_penalty_weight: float = 4.0,
         turn_penalty_weight: float = 0.5,
         gui: bool = False,
-        seed: Optional[int] = None,
-        goal_override: Optional[Tuple[float, float]] = None,
+        seed: int | None = None,
+        goal_override: tuple[float, float] | None = None,
     ):
         if gym is None:
             raise ImportError("gymnasium is required for WheelchairEnv (pip install gymnasium)")
@@ -80,21 +80,23 @@ class WheelchairEnv(gym.Env if gym is not None else object):
         self.goal_override = goal_override
 
         limits = robot_config.action_limits
-        act_high = np.array([limits.max_linear_vel, limits.max_linear_vel, limits.max_angular_vel], dtype=np.float32)
+        act_high = np.array(
+            [limits.max_linear_vel, limits.max_linear_vel, limits.max_angular_vel], dtype=np.float32
+        )
         self.action_space = spaces.Box(low=-act_high, high=act_high, dtype=np.float32)
         obs_high = np.full(OBS_DIM, np.inf, dtype=np.float32)
         self.observation_space = spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
 
-        self._client: Optional[int] = None
-        self._robot_id: Optional[int] = None
+        self._client: int | None = None
+        self._robot_id: int | None = None
         self._handles = None
-        self._wheelchair_id: Optional[int] = None
-        self._grasp: Optional[grasp_attach.GraspConstraint] = None
-        self._goal_xy: Tuple[float, float] = (0.0, 0.0)
+        self._wheelchair_id: int | None = None
+        self._grasp: grasp_attach.GraspConstraint | None = None
+        self._goal_xy: tuple[float, float] = (0.0, 0.0)
         self._prev_dist = 0.0
         self._step_count = 0
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None):
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         import pybullet as p
 
         if seed is not None:
@@ -114,14 +116,24 @@ class WheelchairEnv(gym.Env if gym is not None else object):
 
         # Spawn the wheelchair with its handle roughly at the robot's resting EE pose,
         # simulating "Align & Grasp" already succeeded.
-        ee_pos = p.getLinkState(self._robot_id, self._handles.ee_link_index, physicsClientId=self._client)[0]
+        ee_pos = p.getLinkState(
+            self._robot_id, self._handles.ee_link_index, physicsClientId=self._client
+        )[0]
         chair_pos = (ee_pos[0] + 0.28, ee_pos[1], 0.18)
-        self._wheelchair_id = p.loadURDF(WHEELCHAIR_URDF, basePosition=chair_pos, physicsClientId=self._client)
+        self._wheelchair_id = p.loadURDF(
+            WHEELCHAIR_URDF, basePosition=chair_pos, physicsClientId=self._client
+        )
         self._grasp = grasp_attach.attach(
-            self._robot_id, self._handles.ee_link_index, self._wheelchair_id, physics_client=self._client
+            self._robot_id,
+            self._handles.ee_link_index,
+            self._wheelchair_id,
+            physics_client=self._client,
         )
 
-        self._goal_xy = self.goal_override or (self._rng.uniform(-wall_half, wall_half), self._rng.uniform(-wall_half, wall_half))
+        self._goal_xy = self.goal_override or (
+            self._rng.uniform(-wall_half, wall_half),
+            self._rng.uniform(-wall_half, wall_half),
+        )
         self._step_count = 0
         self._prev_dist = self._goal_distance()
 
@@ -130,9 +142,16 @@ class WheelchairEnv(gym.Env if gym is not None else object):
     def step(self, action: np.ndarray):
         import pybullet as p
 
-        action = np.clip(np.asarray(action, dtype=np.float32), self.action_space.low, self.action_space.high)
+        action = np.clip(
+            np.asarray(action, dtype=np.float32), self.action_space.low, self.action_space.high
+        )
         vx, vy, omega = action.tolist()
-        p.resetBaseVelocity(self._robot_id, linearVelocity=[vx, vy, 0], angularVelocity=[0, 0, omega], physicsClientId=self._client)
+        p.resetBaseVelocity(
+            self._robot_id,
+            linearVelocity=[vx, vy, 0],
+            angularVelocity=[0, 0, omega],
+            physicsClientId=self._client,
+        )
         for _ in range(self.sim_steps_per_action):
             p.stepSimulation(physicsClientId=self._client)
 
@@ -144,7 +163,11 @@ class WheelchairEnv(gym.Env if gym is not None else object):
         roll, pitch = self._wheelchair_tilt()
         tilt_mag = math.hypot(roll, pitch)
 
-        reward = 5.0 * progress - self.tilt_penalty_weight * tilt_mag - self.turn_penalty_weight * abs(omega)
+        reward = (
+            5.0 * progress
+            - self.tilt_penalty_weight * tilt_mag
+            - self.turn_penalty_weight * abs(omega)
+        )
 
         terminated = False
         tipped = tilt_mag > TIP_OVER_TILT_RAD
@@ -186,7 +209,7 @@ class WheelchairEnv(gym.Env if gym is not None else object):
 
         return p.getBasePositionAndOrientation(self._wheelchair_id, physicsClientId=self._client)
 
-    def _wheelchair_tilt(self) -> Tuple[float, float]:
+    def _wheelchair_tilt(self) -> tuple[float, float]:
         import pybullet as p
 
         _, orn = self._wheelchair_pose()

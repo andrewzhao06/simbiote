@@ -23,14 +23,14 @@ which you used. See docs/TELEOP_IPHONE_CAMERA.md for the setup walkthrough.
 
 from __future__ import annotations
 
-import glob
+import contextlib
 import os
 import platform
 import re
 import threading
 import time
 from dataclasses import dataclass
-from typing import Optional, Union
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -40,7 +40,7 @@ DEFAULT_HEIGHT = 720
 DEFAULT_FPS = 30
 
 # A camera source is either an OS device index or a stream URL / device path.
-CameraSource = Union[int, str]
+CameraSource = int | str
 
 _URL_RE = re.compile(r"^[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
 
@@ -89,7 +89,7 @@ class FrameSource:
     rotate: int = 0
 
     @property
-    def device_index(self) -> Optional[int]:
+    def device_index(self) -> int | None:
         """Backwards-compatible accessor; None when the source is a stream."""
 
         return self.source if isinstance(self.source, int) else None
@@ -98,7 +98,7 @@ class FrameSource:
         code = _ROTATIONS.get(self.rotate)
         return frame if code is None else cv2.rotate(frame, code)
 
-    def read(self) -> Optional[np.ndarray]:
+    def read(self) -> np.ndarray | None:
         ok, frame = self.cap.read()
         if not ok or frame is None:
             return None
@@ -107,7 +107,7 @@ class FrameSource:
     def release(self) -> None:
         self.cap.release()
 
-    def __enter__(self) -> "FrameSource":
+    def __enter__(self) -> FrameSource:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -131,7 +131,7 @@ class ThreadedFrameSource:
     def __init__(self, base: FrameSource):
         self._base = base
         self._lock = threading.Lock()
-        self._latest: Optional[np.ndarray] = None
+        self._latest: np.ndarray | None = None
         self._stopped = threading.Event()
         self._thread = threading.Thread(target=self._pump, daemon=True)
         self._thread.start()
@@ -154,7 +154,7 @@ class ThreadedFrameSource:
         return self._base.source
 
     @property
-    def device_index(self) -> Optional[int]:
+    def device_index(self) -> int | None:
         return self._base.device_index
 
     def _pump(self) -> None:
@@ -166,7 +166,7 @@ class ThreadedFrameSource:
             with self._lock:
                 self._latest = frame
 
-    def read(self, timeout: float = 5.0) -> Optional[np.ndarray]:
+    def read(self, timeout: float = 5.0) -> np.ndarray | None:
         """Return the most recent frame, waiting for the first one to land."""
 
         deadline = time.time() + timeout
@@ -185,7 +185,7 @@ class ThreadedFrameSource:
         self._thread.join(timeout=1.0)
         self._base.release()
 
-    def __enter__(self) -> "ThreadedFrameSource":
+    def __enter__(self) -> ThreadedFrameSource:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -195,7 +195,7 @@ class ThreadedFrameSource:
 def list_video_devices() -> list[str]:
     """Return the /dev/video* nodes that exist (Linux only, no probing)."""
 
-    return sorted(glob.glob("/dev/video*"))
+    return sorted(str(node) for node in Path("/dev").glob("video*"))
 
 
 def list_camera_indices(max_index: int = 8) -> list[int]:
@@ -220,8 +220,8 @@ def list_camera_indices(max_index: int = 8) -> list[int]:
 
 
 def resolve_source(
-    source: Optional[CameraSource] = None,
-    device_index: Optional[int] = None,
+    source: CameraSource | None = None,
+    device_index: int | None = None,
 ) -> CameraSource:
     """Work out which camera to open.
 
@@ -272,16 +272,16 @@ def _open_failure_message(source: CameraSource) -> str:
 
 
 def open_camera(
-    device_index: Optional[int] = None,
+    device_index: int | None = None,
     width: int = DEFAULT_WIDTH,
     height: int = DEFAULT_HEIGHT,
     fps: int = DEFAULT_FPS,
-    source: Optional[CameraSource] = None,
+    source: CameraSource | None = None,
     rotate: int = 0,
     threaded: bool = False,
     open_retries: int = 5,
     open_retry_delay: float = 2.0,
-) -> Union[FrameSource, ThreadedFrameSource]:
+) -> FrameSource | ThreadedFrameSource:
     """Open the teleop camera feed.
 
     source: an OS camera index (int), a `/dev/videoN` path, or a stream URL
@@ -305,7 +305,7 @@ def open_camera(
     # away. So a session started right after a probe, or right after a
     # restart, hits a busy server and used to die on the spot. Retry briefly
     # rather than making the operator re-run the command.
-    last_error: Optional[BaseException] = None
+    last_error: BaseException | None = None
     for attempt in range(open_retries + 1):
         try:
             if _is_stream(resolved):
@@ -336,16 +336,14 @@ def open_camera(
 
     # Keep latency down: without this OpenCV buffers frames and teleop drifts
     # further behind the operator's hand the longer the session runs.
-    try:
+    with contextlib.suppress(cv2.error):  # pragma: no cover - backend dependent
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    except cv2.error:  # pragma: no cover - backend dependent
-        pass
 
     actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or width
     actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or height
     actual_fps = int(cap.get(cv2.CAP_PROP_FPS)) or fps
 
-    rotate = int(os.environ.get("SIMBIOTE_CAMERA_ROTATE", "0")) if not rotate else rotate
+    rotate = rotate or int(os.environ.get("SIMBIOTE_CAMERA_ROTATE", "0"))
     if rotate not in (0, 90, 180, 270):
         raise ValueError(f"rotate must be one of 0/90/180/270, got {rotate!r}")
     if rotate in (90, 270):

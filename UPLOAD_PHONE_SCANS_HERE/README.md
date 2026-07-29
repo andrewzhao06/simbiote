@@ -36,18 +36,16 @@ UPLOAD_PHONE_SCANS_HERE/
 ## Validate after upload
 
 ```powershell
-$env:PYTHONPATH="$PWD\src"
-python -m factoryflow_mapper.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
+python -m simbiote.mapper.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
 ```
 
 ## Preview locally
 
 ```powershell
-$env:PYTHONPATH="$PWD\src"
 $env:FACTORYFLOW_MODE="preview"
 $env:FACTORYFLOW_WORK_ROOT="$PWD\.local\work"
 
-python -m factoryflow_mapper.cli --config config\mapper.example.toml run `
+python -m simbiote.mapper.cli --config config\mapper.example.toml run `
   --capture ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough" `
   --out ".\.local\preview.usda"
 ```
@@ -57,7 +55,7 @@ python -m factoryflow_mapper.cli --config config\mapper.example.toml run `
 If you also want the scan on the external drive used by GB10:
 
 ```powershell
-python scripts\import_stray_capture.py ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough" --name hospital-walkthrough
+python scripts\mapper\import_stray_capture.py ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough" --name hospital-walkthrough
 ```
 
 That copies it to `D:\AI\captures\hospital-walkthrough`.

@@ -14,7 +14,7 @@ loop is offline by design.
 
 | Owner | Responsibility | Primary code |
 | --- | --- | --- |
-| Gagan | Stray Scanner capture → OpenUSD scene map | `src/` |
+| Gagan | Stray Scanner capture → OpenUSD scene map | `simbiote/mapper/` |
 | Suraj | Simulation, robot interfaces, and policy training | `simbiote/sim_env/`, `simbiote/training/` |
 | Sky | Hand-tracking teleoperation | `simbiote/teleop/` |
 | Andrew | Scene querying and agentic robot control | `simbiote/agentic/` |
@@ -29,7 +29,7 @@ complete suite with `python -m pytest`.
 
 ```
                          ┌──────────────────────────────────────────────┐
-   iPhone (LiDAR) ─────▶│ 1. SCAN      src/                           │
+   iPhone (LiDAR) ─────▶│ 1. SCAN      simbiote/mapper/               │
    Stray Scanner         │    phone scan → OpenUSD scene + scene graph  │
                          └───────────────────────┬──────────────────────┘
                                                  ▼
@@ -62,7 +62,7 @@ were built in parallel and still snap together.
 
 ## The four modules
 
-### 1. Scan → Map — `src/`
+### 1. Scan → Map — `simbiote/mapper/`
 
 Turns an **iPhone LiDAR scan** (a [Stray Scanner](https://apps.apple.com/app/stray-scanner/id1557051662)
 export: RGB video, LiDAR depth, confidence maps, IMU, and ARKit poses) into a
@@ -229,17 +229,16 @@ this repo. Each scan should be its own subfolder containing `camera_matrix.csv`,
 # Option A: drag the phone export folder into UPLOAD_PHONE_SCANS_HERE in File Explorer
 
 # Option B: import from anywhere
-python scripts\import_stray_capture.py "C:\path\to\StrayScannerExport" --name hospital-walkthrough
+python scripts\mapper\import_stray_capture.py "C:\path\to\StrayScannerExport" --name hospital-walkthrough
 
 # Optional: also copy onto the SSD for GB10
-python scripts\import_stray_capture.py "C:\path\to\StrayScannerExport" --name hospital-walkthrough --ssd
+python scripts\mapper\import_stray_capture.py "C:\path\to\StrayScannerExport" --name hospital-walkthrough --ssd
 ```
 
 Then validate:
 
 ```powershell
-$env:PYTHONPATH="$PWD\src"
-python -m src.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
+python -m simbiote.mapper.cli ingest ".\UPLOAD_PHONE_SCANS_HERE\hospital-walkthrough"
 ```
 
 ### Metadata-only Stray Scanner export
@@ -267,11 +266,10 @@ OpenUSD `Points` layer, then composes that into the mapper output. This is a rea
 capture-geometry preview; it is not a 3DGRUT reconstruction.
 
 ```powershell
-$env:PYTHONPATH="$PWD\src"
 $env:FACTORYFLOW_MODE="preview"
 $env:FACTORYFLOW_WORK_ROOT="$PWD\.local\work"
 
-python -m src.cli --config config/mapper.example.toml run `
+python -m simbiote.mapper.cli --config config/mapper.example.toml run `
   --capture ".\UPLOAD_PHONE_SCANS_HERE\<scan-name>" `
   --out ".\.local\preview.usda"
 ```
@@ -311,15 +309,15 @@ captures inside the Git repository:
         └── hospital.usd
 ```
 
-`scripts/setup_gb10_mapper.sh` detects `<SSD>/AI` automatically and generates the
+`scripts/mapper/setup_gb10_mapper.sh` detects `<SSD>/AI` automatically and generates the
 mapper config for this layout. Isaac Sim and Isaac Lab source are staged on the
 SSD, but must be built on the ARM64 GB10.
 
 ### Setup
 
 ```bash
-chmod +x scripts/setup_gb10_mapper.sh
-./scripts/setup_gb10_mapper.sh /absolute/path/to/ssd
+chmod +x scripts/mapper/setup_gb10_mapper.sh
+./scripts/mapper/setup_gb10_mapper.sh /absolute/path/to/ssd
 ```
 
 This creates the mapper work root, generates `config/mapper.gb10.toml`, and
@@ -390,12 +388,12 @@ interfaces rather than mock output:
 4. `run_sam3.sh` uses local `sam3.pt` from the official `facebook/sam3`
    repository to turn fixed text prompts into the `detections.json` contract.
    For **multi-frame** labeling use `scripts/gb10/adapters/sam3_detect.py`;
-   `scripts/gb10/sam3_labels.py` labels only the first video frame.
+   `scripts/gb10/adapters/sam3_labels.py` labels only the first video frame.
 
 Run the setup script, then source its generated environment:
 
 ```bash
-./scripts/setup_gb10_mapper.sh /mnt/factoryflow-ssd
+./scripts/mapper/setup_gb10_mapper.sh /mnt/factoryflow-ssd
 source config/mapper.gb10.env
 ```
 
@@ -416,7 +414,7 @@ Windows environment will not work.
 Run the strict hardware and asset check before attempting a production map:
 
 ```bash
-scripts/gb10/preflight_mapper.sh /mnt/factoryflow-ssd/AI "$PWD"
+scripts/gb10/mapper/preflight_mapper.sh /mnt/factoryflow-ssd/AI "$PWD"
 ```
 
 It blocks on missing ARM64/NVIDIA runtime, checkpoints, repositories, COLMAP,
@@ -448,9 +446,14 @@ validation rejects proxy output.
 
 ## Repository layout
 
+Everything importable lives under the single `simbiote/` package — including
+its data files, so a built wheel carries the URDFs and stand-in scene graphs
+the code loads at runtime. Everything run by path lives under `scripts/`,
+grouped by the module it serves.
+
 ```text
-src/   # 1. scan → OpenUSD map
-simbiote/                 # the platform package
+simbiote/                 # the platform package — the only importable tree
+├── mapper/               #  1. scan → OpenUSD map + scene graph
 ├── sim_env/              #  2. PyBullet envs + the Isaac hospital tier
 ├── training/             #  2. PPO + behavioral cloning
 ├── robot/                #  2. engine-agnostic robot config
@@ -458,12 +461,21 @@ simbiote/                 # the platform package
 ├── teleop/               #  3. hand-tracking teleoperation
 ├── agentic/              #  4. natural-language command → skills
 ├── sim_stub/             #     toy PyBullet robot for teleop preview
+├── assets/               #     packaged data: URDFs, stand-in scene graphs
 └── demo_logger.py        #     shared session logger (feeds retraining)
 
-scripts/                  # task-oriented utilities and entry points
-├── gb10/                 # GB10 adapters, Isaac tools, and agentic control
-├── teleop/               # teleoperation entry points
-└── training/             # demonstration and policy-training utilities
+scripts/                  # run by path, not imported; grouped by module
+├── mapper/               #  1. scan import + GB10 mapper setup
+├── training/             #  2. demonstration and policy-training utilities
+├── teleop/               #  3. teleoperation entry points
+└── gb10/                 #     GB10-only tooling
+    ├── adapters/         #       COLMAP / Depth Anything / 3DGRUT / SAM 3
+    ├── mapper/           #       USD contract checks and viewers, preflight
+    ├── isaac/            #       hospital scene checks, viewers, nav eval
+    ├── teleop/           #       Isaac-side teleop receiver, USB tunnel, MANO
+    ├── agentic/          #       hospital demo/server and the `say` client
+    └── harness/          #       build-out status checks and trend reporting
+
 tests/                    # tests grouped by platform domain
 ├── mapper/               # scan-to-map pipeline
 ├── sim_env/              # simulation environments
@@ -471,11 +483,11 @@ tests/                    # tests grouped by platform domain
 ├── robot_iface/          # shared robot schemas
 ├── teleop/               # hand-tracking control
 └── agentic/              # natural-language planning and execution
-artifacts/mapper/         # checked-in mapper output examples
+
+artifacts/mapper/         # checked-in scene graphs from real scans (.usda is gitignored)
 checkpoints/              # trained policies (nav_bc.pt is the one to use)
 config/                   # mapper config (example + generated GB10)
 docs/                     # plans, operations guides, and module notes
-assets/                   # stand-in URDFs for laptop testing
 UPLOAD_PHONE_SCANS_HERE/  # phone scan drop zone
 ```
 
@@ -489,6 +501,17 @@ Console entry points (`pyproject.toml`): `simbiote-map`, `simbiote-teleop`,
 - **PyBullet on Windows** has no PyPI wheel; install requires MSVC Build Tools,
   or use WSL2 / Linux / macOS. The package degrades gracefully — non-physics
   code runs fine, and physics tests skip rather than crash.
+- **PyBullet on recent macOS** has no wheel either, and its vendored zlib
+  defines `fdopen` to `NULL` on Apple platforms, which then breaks the system
+  `<stdio.h>`. Build it with that macro neutralised:
+
+  ```bash
+  CFLAGS="-std=gnu17 -Dfdopen=fdopen" CXXFLAGS="-Dfdopen=fdopen" pip install pybullet
+  ```
+- **MediaPipe is version-capped** (`>=0.10,<=0.10.21`). Later releases and 1.x
+  removed the legacy `mediapipe.solutions` API the hand tracker is written
+  against; unpinned installs resolve to one of those and teleop refuses to
+  start. `hand_tracking._mediapipe_available()` detects this and says so.
 - **On linux-aarch64** (the GB10), `pybullet`, `mediapipe`, and `usd-core` have
   no wheels. Teleop uses WiLoR, USD comes from Isaac Sim's bundled `pxr`, and a
   locally-built pybullet wheel is used. See [`docs/modules/mapper.md`](docs/modules/mapper.md).
@@ -526,7 +549,7 @@ uv run ruff check .
 
 | Module | Owner |
 | --- | --- |
-| Scan → Map (`src/`) | Gagan |
+| Scan → Map (`simbiote/mapper/`) | Gagan |
 | Simulate & Train (`sim_env/`, `training/`, `robot/`) | Suraj |
 | Teleoperation (`teleop/`) | Sky |
 | Agentic Control (`agentic/`) | Andrew |

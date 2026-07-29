@@ -43,19 +43,19 @@ from typing import Protocol, runtime_checkable
 from simbiote.agentic.scene_query import SceneGraph
 
 __all__ = [
-    "LLMBackend",
+    "DEFAULT_PROFILE",
+    "PROFILES",
     "FakeBackend",
-    "OpenAICompatBackend",
     "FallbackBackend",
+    "LLMBackend",
     "LLMError",
     "ModelProfile",
-    "PROFILES",
-    "DEFAULT_PROFILE",
-    "resolve_profile",
+    "OpenAICompatBackend",
     "backend_id",
-    "primary_of",
     "describe_backend",
     "make_backend",
+    "primary_of",
+    "resolve_profile",
 ]
 
 DEFAULT_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible port
@@ -251,7 +251,7 @@ class FakeBackend:
     def __init__(self, scene: SceneGraph) -> None:
         self.scene = scene
 
-    def complete(self, system: str, user: str) -> str:  # noqa: ARG002 - system unused by design
+    def complete(self, system: str, user: str) -> str:
         return json.dumps({"tool_calls": self._plan(user)}, indent=2)
 
     # ---- planning ---------------------------------------------------------
@@ -263,7 +263,12 @@ class FakeBackend:
         obj = self.scene.get_object(obj_id) if obj_id else None
 
         # Compound / stateful: a payload that gets attached, driven, released.
-        if obj and "wheelchair" in obj.label.lower() and destination and self._MOVE_PAYLOAD.search(lower):
+        if (
+            obj
+            and "wheelchair" in obj.label.lower()
+            and destination
+            and self._MOVE_PAYLOAD.search(lower)
+        ):
             return [
                 {"tool": "approach_wheelchair", "args": {"object_id": obj.id}},
                 {"tool": "align_gripper", "args": {"object_id": obj.id}},
@@ -325,7 +330,7 @@ class OpenAICompatBackend:
         temperature: float = 0.0,
         max_attempts: int = 3,
         backoff_s: float = 1.0,
-        sleep: "object | None" = None,
+        sleep: object | None = None,
     ) -> None:
         _reject_ultra(model)
         self.base_url = base_url.rstrip("/")
@@ -345,7 +350,7 @@ class OpenAICompatBackend:
     @classmethod
     def from_profile(
         cls, profile: ModelProfile, *, api_key: str | None = None, **kwargs: object
-    ) -> "OpenAICompatBackend":
+    ) -> OpenAICompatBackend:
         return cls(
             base_url=profile.base_url,
             model=profile.model,
@@ -476,7 +481,7 @@ class FallbackBackend:
         primary: LLMBackend,
         fallback: LLMBackend,
         *,
-        on_degrade: "object | None" = None,
+        on_degrade: object | None = None,
     ) -> None:
         self.primary = primary
         self.fallback = fallback
@@ -542,7 +547,7 @@ def make_backend(
     *,
     profile: str | None = None,
     fallback: bool = True,
-    on_degrade: "object | None" = None,
+    on_degrade: object | None = None,
 ) -> LLMBackend:
     """Select a backend by name.
 

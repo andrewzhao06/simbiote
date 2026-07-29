@@ -13,14 +13,14 @@ from dataclasses import dataclass
 from typing import Any
 
 __all__ = [
-    "ToolCall",
-    "ToolSpec",
     "TOOL_SPECS",
     "SchemaError",
+    "ToolCall",
+    "ToolSpec",
     "parse_tool_calls",
+    "tool_schema_text",
     "validate_call",
     "validate_calls",
-    "tool_schema_text",
 ]
 
 
@@ -88,7 +88,10 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     "nav_with_payload": ToolSpec(
         name="nav_with_payload",
-        description="Navigate to a location while a payload is attached, using the co-navigation policy.",
+        description=(
+            "Navigate to a location while a payload is attached, using the "
+            "co-navigation policy."
+        ),
         args={"location_id": "location_id"},
         wheelchair_only=True,
     ),
@@ -202,10 +205,8 @@ def validate_call(call: ToolCall, scene: Any) -> list[str]:
 
     missing = set(spec.args) - set(call.args)
     extra = set(call.args) - set(spec.args)
-    for name in sorted(missing):
-        errors.append(f"{call.tool}: missing required argument {name!r}")
-    for name in sorted(extra):
-        errors.append(f"{call.tool}: unexpected argument {name!r}")
+    errors += [f"{call.tool}: missing required argument {name!r}" for name in sorted(missing)]
+    errors += [f"{call.tool}: unexpected argument {name!r}" for name in sorted(extra)]
 
     for name, kind in spec.args.items():
         if name not in call.args:

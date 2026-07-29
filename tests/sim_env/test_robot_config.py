@@ -19,11 +19,9 @@ def test_stand_in_urdf_file_exists():
 
 
 def test_wheelchair_urdf_file_exists():
-    from pathlib import Path
+    from simbiote.assets import WHEELCHAIR_URDF
 
-    from simbiote.robot.robot_config import ASSETS_DIR
-
-    assert (ASSETS_DIR / "wheelchair" / "wheelchair.urdf").exists()
+    assert WHEELCHAIR_URDF.exists()
 
 
 def test_ridgeback_franka_config_resolves_usd_path():

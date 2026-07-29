@@ -21,8 +21,8 @@ world-position resolution is a placeholder registry here; swap
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -37,13 +37,13 @@ CHECKPOINT_DIR = Path(__file__).resolve().parent.parent.parent / "checkpoints"
 
 # Placeholder scene registry -- real values come from Step 1's scene graph
 # (`scene_query.py`'s `list_locations()`/`list_objects()`) once it exists.
-DEFAULT_LOCATIONS: Dict[str, Tuple[float, float]] = {
+DEFAULT_LOCATIONS: dict[str, tuple[float, float]] = {
     "room_1": (1.2, 0.8),
     "room_2": (-1.2, 0.8),
     "supply_room": (0.0, -1.4),
     "nurses_station": (1.4, -1.2),
 }
-DEFAULT_OBJECTS: Dict[str, Tuple[float, float, float]] = {
+DEFAULT_OBJECTS: dict[str, tuple[float, float, float]] = {
     "tray_1": (0.45, 0.05, 0.25),
     "tray_2": (0.4, -0.15, 0.25),
 }
@@ -84,7 +84,7 @@ def _rollout(env, infer_fn: Callable[[np.ndarray], np.ndarray], max_steps: int) 
     info: dict = {}
     for _ in range(max_steps):
         action = infer_fn(obs[None, :])[0]
-        obs, reward, terminated, truncated, info = env.step(action)
+        obs, _reward, terminated, truncated, info = env.step(action)
         if terminated or truncated:
             break
     env.close()
@@ -92,10 +92,10 @@ def _rollout(env, infer_fn: Callable[[np.ndarray], np.ndarray], max_steps: int) 
 
 
 def fit_locations_to_arena(
-    locations: Dict[str, Tuple[float, float]],
+    locations: dict[str, tuple[float, float]],
     room_size: float = 4.0,
     margin: float = 0.6,
-) -> Dict[str, Tuple[float, float]]:
+) -> dict[str, tuple[float, float]]:
     """Map scene-graph world coordinates into the nav arena, preserving layout.
 
     Step 1's scene graph is in real building coordinates -- the hospital
@@ -133,14 +133,16 @@ def fit_locations_to_arena(
 def navigate_to(
     location_id: str,
     checkpoint_path: str | Path = CHECKPOINT_DIR / "nav_ppo.pt",
-    locations: Dict[str, Tuple[float, float]] = DEFAULT_LOCATIONS,
+    locations: dict[str, tuple[float, float]] = DEFAULT_LOCATIONS,
     gui: bool = False,
     max_steps: int = 300,
     room_size: float = 4.0,
 ) -> dict:
     """OpenClaw/agentic tool: drive the trained nav policy to `location_id`."""
     if location_id not in locations:
-        raise KeyError(f"navigate_to: unknown location_id '{location_id}'. Known: {list(locations)}")
+        raise KeyError(
+            f"navigate_to: unknown location_id '{location_id}'. Known: {list(locations)}"
+        )
     register()
     infer_fn = _load_inference_fn(checkpoint_path)
     goal = fit_locations_to_arena(locations, room_size=room_size)[location_id]
@@ -159,7 +161,7 @@ def navigate_to(
 def pick_up(
     object_id: str,
     checkpoint_path: str | Path = CHECKPOINT_DIR / "grasp_ppo.pt",
-    objects: Dict[str, Tuple[float, float, float]] = DEFAULT_OBJECTS,
+    objects: dict[str, tuple[float, float, float]] = DEFAULT_OBJECTS,
     gui: bool = False,
     max_steps: int = 200,
 ) -> dict:
@@ -185,11 +187,17 @@ def pick_up(
 def approach_wheelchair(
     location_id: str,
     checkpoint_path: str | Path = CHECKPOINT_DIR / "nav_ppo.pt",
-    locations: Dict[str, Tuple[float, float]] = DEFAULT_LOCATIONS,
+    locations: dict[str, tuple[float, float]] = DEFAULT_LOCATIONS,
     gui: bool = False,
     max_steps: int = 300,
 ) -> dict:
-    result = navigate_to(location_id, checkpoint_path=checkpoint_path, locations=locations, gui=gui, max_steps=max_steps)
+    result = navigate_to(
+        location_id,
+        checkpoint_path=checkpoint_path,
+        locations=locations,
+        gui=gui,
+        max_steps=max_steps,
+    )
     return {**result, "skill": "approach_wheelchair"}
 
 
@@ -198,19 +206,26 @@ def attach_handle(robot: SpawnedRobot, wheelchair_body_id: int) -> GraspConstrai
     robot's end-effector to the wheelchair at its current relative pose --
     the caller (task_executor.py) is responsible for having already driven
     the EE to the handle via `robot_tools`/IK before calling this."""
-    return attach(robot.robot_id, robot.handles.ee_link_index, wheelchair_body_id, physics_client=robot.physics_client)
+    return attach(
+        robot.robot_id,
+        robot.handles.ee_link_index,
+        wheelchair_body_id,
+        physics_client=robot.physics_client,
+    )
 
 
 def nav_with_payload(
     location_id: str,
     checkpoint_path: str | Path = CHECKPOINT_DIR / "wheelchair_ppo.pt",
-    locations: Dict[str, Tuple[float, float]] = DEFAULT_LOCATIONS,
+    locations: dict[str, tuple[float, float]] = DEFAULT_LOCATIONS,
     gui: bool = False,
     max_steps: int = 300,
 ) -> dict:
     """FSM state 3 (§5.5: Co-Nav Policy, Base + Wheelchair)."""
     if location_id not in locations:
-        raise KeyError(f"nav_with_payload: unknown location_id '{location_id}'. Known: {list(locations)}")
+        raise KeyError(
+            f"nav_with_payload: unknown location_id '{location_id}'. Known: {list(locations)}"
+        )
     register()
     infer_fn = _load_inference_fn(checkpoint_path)
     env = WheelchairEnv(goal_override=locations[location_id], gui=gui, max_steps=max_steps)

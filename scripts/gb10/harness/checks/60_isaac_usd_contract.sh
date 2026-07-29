@@ -3,7 +3,7 @@
 # contract -- navigable floor, graspable object, colliders, metres.
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-validator="${REPO_ROOT}/scripts/gb10/validate_usd_isaac.sh"
+validator="${REPO_ROOT}/scripts/gb10/mapper/validate_usd_isaac.sh"
 [[ -x "${validator}" ]] || blocked "Isaac validator missing: ${validator}"
 
 # Prefer the newest real (non-proxy) stage; fall back to the proxy scene.

@@ -12,10 +12,8 @@ instead of `STAND_IN_CONFIG` to `spawn_robot()` / the task envs.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, List, Tuple
 
-ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
+from simbiote.assets import STAND_IN_ROBOT_URDF
 
 
 @dataclass(frozen=True)
@@ -33,7 +31,7 @@ class ActionLimits:
 
 @dataclass(frozen=True)
 class SpawnPose:
-    position: Tuple[float, float, float] = (0.0, 0.0, 0.05)
+    position: tuple[float, float, float] = (0.0, 0.0, 0.05)
     yaw: float = 0.0
 
 
@@ -49,8 +47,8 @@ class RobotConfig:
     usd_path: str | None = None    # Isaac Sim
 
     base_link_name: str = "base_link"
-    arm_joint_names: List[str] = field(default_factory=list)
-    gripper_joint_names: List[str] = field(default_factory=list)
+    arm_joint_names: list[str] = field(default_factory=list)
+    gripper_joint_names: list[str] = field(default_factory=list)
     ee_link_name: str = "ee_link"
     arm_base_link_name: str = "arm_base_link"
 
@@ -58,7 +56,7 @@ class RobotConfig:
     default_spawn_pose: SpawnPose = field(default_factory=SpawnPose)
 
     # Where sensors/attachment points live, by name -> link they're rigidly mounted to.
-    sensor_attachment_points: Dict[str, str] = field(default_factory=dict)
+    sensor_attachment_points: dict[str, str] = field(default_factory=dict)
 
     def resolve_asset_path(self) -> str:
         if self.engine == "pybullet":
@@ -79,7 +77,7 @@ class RobotConfig:
 STAND_IN_CONFIG = RobotConfig(
     name="stand_in_pybullet",
     engine="pybullet",
-    urdf_path=str(ASSETS_DIR / "robots" / "stand_in_robot.urdf"),
+    urdf_path=str(STAND_IN_ROBOT_URDF),
     base_link_name="base_link",
     # shoulder_yaw_joint first: without a yaw DOF the arm is planar and cannot
     # reach anything off the x-z plane (see stand_in_robot.urdf).
@@ -97,7 +95,7 @@ STAND_IN_CONFIG = RobotConfig(
 # (§5.4 — `RidgebackFranka/ridgeback_franka.usd`, no custom authoring needed).
 #
 # Joint/link names below were verified against the articulation as actually
-# loaded on the GB10 (see scripts/gb10/check_isaac_hospital.py): 12 DOF total, made up
+# loaded on the GB10 (see scripts/gb10/isaac/check_isaac_hospital.py): 12 DOF total, made up
 # of 3 dummy planar base joints + panda_joint1..7 + 2 fingers.
 #
 # `usd_path` is relative to Isaac Sim's asset root, not absolute: resolve it

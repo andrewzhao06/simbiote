@@ -6,7 +6,7 @@ pursuit` swaps the policy for a straight-at-the-carrot reference so the policy
 number can be read against something.
 
     /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-        scripts/gb10/eval_hospital_nav.py --checkpoint checkpoints/nav_bc.pt
+        scripts/gb10/isaac/eval_hospital_nav.py --checkpoint checkpoints/nav_bc.pt
 """
 
 from __future__ import annotations
@@ -18,7 +18,15 @@ import sys
 from pathlib import Path
 
 sys.stdout.reconfigure(line_buffering=True)
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# These scripts are run by path (often under Isaac Sim's bundled interpreter,
+# where the package isn't installed), so put the repo on sys.path. Located by
+# walking up to pyproject.toml rather than by a fixed parent count, which
+# silently breaks the moment the file moves between script subdirectories.
+REPO_ROOT = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file()
+)
+sys.path.insert(0, str(REPO_ROOT))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--checkpoint", default="checkpoints/nav_bc.pt")
@@ -81,7 +89,10 @@ wins = sum(1 for r in results if r["success"])
 print(f"\n{wins}/{len(results)} traversals succeeded")
 if wins:
     ok = [r for r in results if r["success"]]
-    print(f"  mean efficiency {sum(r['travelled_m'] / max(r['path_length_m'], 0.1) for r in ok) / len(ok):.2f}x")
+    print(
+        f"  mean efficiency "
+        f"{sum(r['travelled_m'] / max(r['path_length_m'], 0.1) for r in ok) / len(ok):.2f}x"
+    )
     print(f"  min clearance over successes {min(r['min_clearance_m'] for r in ok):.2f} m")
 for row in results:
     if not row["success"]:

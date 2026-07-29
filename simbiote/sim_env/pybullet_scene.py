@@ -13,7 +13,6 @@ logic (reward, obs, action) does not change, only what's imported here does.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 from simbiote.robot.robot_config import RobotConfig
 
@@ -36,8 +35,8 @@ def disconnect(client: int) -> None:
 
 
 def load_ground_plane(client: int) -> int:
-    import pybullet_data
     import pybullet as p
+    import pybullet_data
 
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     return p.loadURDF("plane.urdf", physicsClientId=client)
@@ -58,7 +57,7 @@ def load_robot(config: RobotConfig, client: int, fixed_base: bool = False) -> in
     )
 
 
-def joint_name_to_index(body_id: int, client: int) -> Dict[str, int]:
+def joint_name_to_index(body_id: int, client: int) -> dict[str, int]:
     """URDF joint name -> joint/link index. A link's index is defined by the
     index of the joint that attaches it (pybullet convention); base link is -1."""
     import pybullet as p
@@ -71,7 +70,7 @@ def joint_name_to_index(body_id: int, client: int) -> Dict[str, int]:
     return mapping
 
 
-def link_name_to_index(body_id: int, client: int) -> Dict[str, int]:
+def link_name_to_index(body_id: int, client: int) -> dict[str, int]:
     import pybullet as p
 
     mapping = {}
@@ -82,7 +81,7 @@ def link_name_to_index(body_id: int, client: int) -> Dict[str, int]:
     return mapping
 
 
-def movable_joint_indices(body_id: int, client: int) -> List[int]:
+def movable_joint_indices(body_id: int, client: int) -> list[int]:
     """Raw joint indices of every non-fixed joint, in increasing order.
 
     `p.calculateInverseKinematics()` returns one angle per DOF-bearing
@@ -111,13 +110,13 @@ class RobotHandles:
     body_id: int
     client: int
     config: RobotConfig
-    arm_joint_indices: List[int]
-    gripper_joint_indices: List[int]
+    arm_joint_indices: list[int]
+    gripper_joint_indices: list[int]
     ee_link_index: int
     base_link_index: int
     arm_base_link_index: int
-    dof_joint_indices: List[int]  # see movable_joint_indices() -- IK output order
-    _ik_position_of: Dict[int, int] = field(default_factory=dict)
+    dof_joint_indices: list[int]  # see movable_joint_indices() -- IK output order
+    _ik_position_of: dict[int, int] = field(default_factory=dict)
 
     def ik_angle(self, joint_angles, raw_joint_index: int) -> float:
         """Look up `raw_joint_index`'s value out of a
@@ -127,7 +126,7 @@ class RobotHandles:
         return joint_angles[self._ik_position_of[raw_joint_index]]
 
     @classmethod
-    def build(cls, config: RobotConfig, client: int, body_id: int) -> "RobotHandles":
+    def build(cls, config: RobotConfig, client: int, body_id: int) -> RobotHandles:
         joints = joint_name_to_index(body_id, client)
         links = link_name_to_index(body_id, client)
         dof_indices = movable_joint_indices(body_id, client)
@@ -160,16 +159,18 @@ class GraspableObject:
 
 def spawn_graspable_box(
     client: int,
-    position: Tuple[float, float, float],
-    half_extents: Tuple[float, float, float] = (0.03, 0.03, 0.03),
+    position: tuple[float, float, float],
+    half_extents: tuple[float, float, float] = (0.03, 0.03, 0.03),
     mass_kg: float = 0.3,
     grasp_type: str = "pinch",
-    rgba: Tuple[float, float, float, float] = (0.8, 0.2, 0.2, 1.0),
+    rgba: tuple[float, float, float, float] = (0.8, 0.2, 0.2, 1.0),
 ) -> GraspableObject:
     import pybullet as p
 
     col = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half_extents), physicsClientId=client)
-    vis = p.createVisualShape(p.GEOM_BOX, halfExtents=list(half_extents), rgbaColor=list(rgba), physicsClientId=client)
+    vis = p.createVisualShape(
+        p.GEOM_BOX, halfExtents=list(half_extents), rgbaColor=list(rgba), physicsClientId=client
+    )
     body_id = p.createMultiBody(
         baseMass=mass_kg,
         baseCollisionShapeIndex=col,
@@ -178,18 +179,25 @@ def spawn_graspable_box(
         physicsClientId=client,
     )
     p.changeDynamics(body_id, -1, lateralFriction=0.8, physicsClientId=client)
-    return GraspableObject(body_id=body_id, is_graspable=True, grasp_type=grasp_type, mass_kg=mass_kg)
+    return GraspableObject(
+        body_id=body_id, is_graspable=True, grasp_type=grasp_type, mass_kg=mass_kg
+    )
 
 
 def spawn_wall(
     client: int,
-    center: Tuple[float, float, float],
-    half_extents: Tuple[float, float, float],
+    center: tuple[float, float, float],
+    half_extents: tuple[float, float, float],
 ) -> int:
     import pybullet as p
 
     col = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half_extents), physicsClientId=client)
-    vis = p.createVisualShape(p.GEOM_BOX, halfExtents=list(half_extents), rgbaColor=[0.6, 0.6, 0.6, 1.0], physicsClientId=client)
+    vis = p.createVisualShape(
+        p.GEOM_BOX,
+        halfExtents=list(half_extents),
+        rgbaColor=[0.6, 0.6, 0.6, 1.0],
+        physicsClientId=client,
+    )
     return p.createMultiBody(
         baseMass=0.0,  # static
         baseCollisionShapeIndex=col,
@@ -201,9 +209,9 @@ def spawn_wall(
 
 def spawn_table(
     client: int,
-    top_center_xy: Tuple[float, float],
+    top_center_xy: tuple[float, float],
     top_height: float,
-    half_extents_xy: Tuple[float, float] = (0.3, 0.3),
+    half_extents_xy: tuple[float, float] = (0.3, 0.3),
     thickness: float = 0.04,
 ) -> int:
     """A static platform so a spawned graspable object rests at a sane
@@ -214,7 +222,12 @@ def spawn_table(
     half_extents = (half_extents_xy[0], half_extents_xy[1], thickness / 2)
     center = (top_center_xy[0], top_center_xy[1], top_height - thickness / 2)
     col = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half_extents), physicsClientId=client)
-    vis = p.createVisualShape(p.GEOM_BOX, halfExtents=list(half_extents), rgbaColor=[0.55, 0.4, 0.25, 1.0], physicsClientId=client)
+    vis = p.createVisualShape(
+        p.GEOM_BOX,
+        halfExtents=list(half_extents),
+        rgbaColor=[0.55, 0.4, 0.25, 1.0],
+        physicsClientId=client,
+    )
     return p.createMultiBody(
         baseMass=0.0,
         baseCollisionShapeIndex=col,
@@ -224,17 +237,18 @@ def spawn_table(
     )
 
 
-def build_stand_in_arena(client: int, room_size: float = 4.0, wall_height: float = 0.6) -> List[int]:
+def build_stand_in_arena(
+    client: int, room_size: float = 4.0, wall_height: float = 0.6
+) -> list[int]:
     """A simple box arena standing in for a scanned room (spec §5.4: "Don't
     chase visual or dimensional accuracy here; you're validating reward
     logic and constraint behavior, not producing a demo asset.")."""
 
     half = room_size / 2.0
     thickness = 0.05
-    ids = [
+    return [
         spawn_wall(client, (half, 0, wall_height / 2), (thickness, half, wall_height / 2)),
         spawn_wall(client, (-half, 0, wall_height / 2), (thickness, half, wall_height / 2)),
         spawn_wall(client, (0, half, wall_height / 2), (half, thickness, wall_height / 2)),
         spawn_wall(client, (0, -half, wall_height / 2), (half, thickness, wall_height / 2)),
     ]
-    return ids

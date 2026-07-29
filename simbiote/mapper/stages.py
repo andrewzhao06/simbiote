@@ -10,8 +10,8 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from src.config import MapperConfig
-from src.models import (
+from simbiote.mapper.config import MapperConfig
+from simbiote.mapper.models import (
     BoundingBox,
     CaptureBundle,
     Frame,
@@ -63,8 +63,21 @@ def _run_adapter(env_name: str, variables: dict[str, Path], cwd: Path) -> None:
         raise StageError(
             f"Production mode requires {env_name}; see config/mapper.example.toml"
         )
-    command = template.format(**{key: str(value) for key, value in variables.items()})
-    result = subprocess.run(shlex.split(command), cwd=cwd, check=False)
+    # Split the *template* into argv first, then substitute. Formatting before
+    # splitting means any space inside a substituted path -- the capture folder,
+    # the SSD mount, the repo checkout -- becomes an argument boundary, and the
+    # adapter is invoked with a truncated path that doesn't exist.
+    values = {key: str(value) for key, value in variables.items()}
+    try:
+        command = [token.format(**values) for token in shlex.split(template)]
+    except (IndexError, KeyError) as exc:
+        raise StageError(
+            f"{env_name} uses placeholder {exc} which this stage does not provide; "
+            f"available: {', '.join(sorted(values))}"
+        ) from exc
+    if not command:
+        raise StageError(f"{env_name} is set but empty")
+    result = subprocess.run(command, cwd=cwd, check=False)
     if result.returncode:
         raise StageError(f"{env_name} command failed with exit code {result.returncode}")
 
@@ -110,7 +123,7 @@ def unproject_frame(
     rgb_width: int,
     *,
     pixel_stride: int = 1,
-    mask: "object | None" = None,
+    mask: object | None = None,
 ):
     """Unproject one frame's LiDAR depth map into the ARKit world frame.
 
@@ -214,12 +227,12 @@ def rgb_width(capture: CaptureBundle, config: MapperConfig) -> int:
     # ffprobe is optional for preview mode. Phone principal points sit within a
     # pixel or two of the frame centre, so 2*cx recovers the width well enough
     # to keep the depth/RGB ratio right.
-    return int(round(2 * capture.frames[0].intrinsics.cx))
+    return round(2 * capture.frames[0].intrinsics.cx)
 
 
 def _preview_points(
     capture: CaptureBundle, config: MapperConfig
-) -> "list[tuple[float, float, float]]":
+) -> list[tuple[float, float, float]]:
     import numpy as np
 
     width = rgb_width(capture, config)
@@ -249,7 +262,7 @@ FLOOR_SLAB_METRES = 0.08
 
 
 def _measure_cloud(
-    points: "list[tuple[float, float, float]]",
+    points: list[tuple[float, float, float]],
 ) -> tuple[BoundingBox, BoundingBox | None]:
     """Scene bounds, plus the floor slab found inside them.
 
@@ -299,7 +312,7 @@ def _measure_cloud(
 
 
 def _write_preview_geometry(
-    points: "list[tuple[float, float, float]]", output: Path
+    points: list[tuple[float, float, float]], output: Path
 ) -> Path:
     serialized = ",\n        ".join(
         f"({x:.5g}, {y:.5g}, {z:.5g})" for x, y, z in points
@@ -403,11 +416,14 @@ def reconstruct(
             },
             output,
         )
-        candidates = (
-            list(output.glob("*.usd"))
-            + list(output.glob("*.usda"))
-            + list(output.glob("*.usdc"))
-            + list(output.glob("*.usdz"))
+        # Sorted, so a run that exports more than one layer picks the same one
+        # every time -- glob order is filesystem order, which differs between
+        # the laptop and the GB10 and makes a re-run silently produce a
+        # different scene.
+        candidates = sorted(
+            path
+            for suffix in (".usd", ".usda", ".usdc", ".usdz")
+            for path in output.glob(f"*{suffix}")
         )
         if not candidates:
             raise StageError(
@@ -458,7 +474,7 @@ def label_scene(
             "FACTORYFLOW_SAM3_COMMAND",
             {
                 "capture": scene.depth.refined.capture.root,
-                "geometry": scene.geometry_path or Path(""),
+                "geometry": scene.geometry_path or Path(),
                 "checkpoint": config.sam3_checkpoint,
                 "output": output,
             },

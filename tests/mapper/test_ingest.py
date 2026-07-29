@@ -2,8 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from src.ingest import CaptureValidationError, load_capture_bundle
-from .fixtures import capture_dir
+from simbiote.mapper.ingest import CaptureValidationError, load_capture_bundle
 
 
 def test_ingest_matches_files_by_frame_id(capture_dir: Path) -> None:

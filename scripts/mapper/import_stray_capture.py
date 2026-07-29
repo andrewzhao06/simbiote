@@ -3,23 +3,41 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
+import sys
 from pathlib import Path
-
 
 REQUIRED_METADATA = ("camera_matrix.csv", "odometry.csv", "imu.csv")
 REQUIRED_MEDIA = ("rgb.mp4", "depth", "confidence")
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = next(
+    parent for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file()
+)
 DEFAULT_DESTINATION = REPO_ROOT / "UPLOAD_PHONE_SCANS_HERE"
-SSD_DESTINATION = Path(r"D:\AI\captures")
+#: The prepared SSD's capture folder. Taken from the same environment variable
+#: the mapper config uses (`FACTORYFLOW_SSD_ROOT`, pointing at `<SSD>/AI`), so
+#: `--ssd` works on the GB10 rather than only on the one Windows box whose
+#: drive letter used to be hardcoded here.
+SSD_ROOT_ENV = "FACTORYFLOW_SSD_ROOT"
+
+
+def ssd_destination() -> Path:
+    root = os.getenv(SSD_ROOT_ENV)
+    if not root:
+        raise ValueError(
+            f"--ssd needs {SSD_ROOT_ENV} set to the SSD's AI/ directory "
+            "(source config/mapper.gb10.env), or pass --ssd-destination."
+        )
+    return Path(root).expanduser() / "captures"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Copy a Stray Scanner export into UPLOAD_PHONE_SCANS_HERE "
-            "(optional --ssd also copies to D:\\AI\\captures)."
+            f"(optional --ssd also copies to ${SSD_ROOT_ENV}/captures)."
         )
     )
     parser.add_argument("source", type=Path, help="Folder exported by Stray Scanner")
@@ -36,7 +54,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--ssd",
         action="store_true",
-        help=f"Also copy the capture to {SSD_DESTINATION}",
+        help=f"Also copy the capture to ${SSD_ROOT_ENV}/captures",
+    )
+    parser.add_argument(
+        "--ssd-destination",
+        type=Path,
+        help=f"Explicit SSD capture folder, overriding ${SSD_ROOT_ENV}",
     )
     parser.add_argument(
         "--allow-metadata-only",
@@ -77,17 +100,27 @@ def copy_capture(source: Path, destination: Path, name: str) -> Path:
 
 def main() -> int:
     args = parse_args()
-    source = args.source.expanduser().resolve()
-    validate_source(source, allow_metadata_only=args.allow_metadata_only)
-    name = safe_name(args.name or source.name)
+    try:
+        source = args.source.expanduser().resolve()
+        validate_source(source, allow_metadata_only=args.allow_metadata_only)
+        name = safe_name(args.name or source.name)
+        # Resolve the SSD target before the first copy, so a misconfigured
+        # --ssd fails before half the work is done rather than after.
+        ssd_target_dir = (
+            (args.ssd_destination.expanduser() if args.ssd_destination else ssd_destination())
+            if args.ssd
+            else None
+        )
 
-    target = copy_capture(source, args.destination.expanduser().resolve(), name)
-    print(f"Uploaded capture to: {target}")
-    print(f'Validate it with: python -m src.cli ingest "{target}"')
+        target = copy_capture(source, args.destination.expanduser().resolve(), name)
+        print(f"Uploaded capture to: {target}")
+        print(f'Validate it with: python -m simbiote.mapper.cli ingest "{target}"')
 
-    if args.ssd:
-        ssd_target = copy_capture(source, SSD_DESTINATION, name)
-        print(f"Also copied to SSD: {ssd_target}")
+        if ssd_target_dir is not None:
+            print(f"Also copied to SSD: {copy_capture(source, ssd_target_dir, name)}")
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
 
     return 0
 

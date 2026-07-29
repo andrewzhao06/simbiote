@@ -11,9 +11,12 @@ numpy>=1.26
 torch>=2.5
 gymnasium>=0.29
 
-# Physics engine (today). Linux/macOS: `pip install pybullet` just works.
+# Physics engine (today). Linux: `pip install pybullet` just works.
 # Windows: install MSVC Build Tools first, or do this slice of the work in
 # WSL2/a Linux VM/a teammate's Mac. See README.
+# macOS: no wheel, and the vendored zlib's `#define fdopen(fd,mode) NULL` on
+# Apple platforms breaks the system <stdio.h>. Build with:
+#   CFLAGS="-std=gnu17 -Dfdopen=fdopen" CXXFLAGS="-Dfdopen=fdopen" pip install pybullet
 pybullet>=3.2.6; sys_platform != "win32"
 
 # Policy export for Steps 3 & 4. onnxscript is required by torch>=2.7's
@@ -25,8 +28,16 @@ onnxscript>=0.1
 # Step 3 -- hand-tracking teleop (Sky). opencv/mediapipe are only imported
 # lazily inside simbiote/teleop/*.py, so the rest of the package (sim_env,
 # training, agentic) works fine without them installed.
+#
+# mediapipe is capped: the legacy `mediapipe.solutions` API that
+# hand_tracking.HandTracker drives is gone from 0.10.30+ and from 1.0 (which
+# ships only `mediapipe.tasks`). Unpinned, a fresh install resolves to 1.x and
+# teleop dies at startup with `module 'mediapipe' has no attribute
+# 'solutions'`. 0.10.21 is the newest release verified to still carry it.
+# `hand_tracking._mediapipe_available()` re-checks at runtime, so a wrong
+# version degrades to a clear error instead of a crash mid-session.
 opencv-python>=4.9
-mediapipe>=0.10
+mediapipe>=0.10,<=0.10.21
 
 # Step 4 -- agentic/LLM control (Andrew). Deliberately has no extra runtime
 # dependency beyond stdlib (urllib) -- see simbiote/agentic/llm_backend.py.

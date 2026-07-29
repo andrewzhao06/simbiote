@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Dict, List
 
 import pybullet as p
 import pybullet_data
@@ -46,8 +45,8 @@ class ToyRobotEnv:
         p.loadURDF("plane.urdf")
         self.body_id = p.loadURDF(str(URDF_PATH), basePosition=spawn_position, useFixedBase=False)
 
-        self._joint_index: Dict[str, int] = {}
-        self._link_name_by_index: Dict[int, str] = {}
+        self._joint_index: dict[str, int] = {}
+        self._link_name_by_index: dict[int, str] = {}
         for i in range(p.getNumJoints(self.body_id)):
             info = p.getJointInfo(self.body_id, i)
             self._joint_index[info[1].decode("utf-8")] = i
@@ -56,7 +55,7 @@ class ToyRobotEnv:
         # "wrist" is the fixed joint whose child link is "hand" (HAND_LINK);
         # joint index doubles as that child link's index in pybullet's convention.
         self._hand_link_index = self._joint_index["wrist"]
-        self._movable_joint_indices: List[int] = [
+        self._movable_joint_indices: list[int] = [
             i
             for i in range(p.getNumJoints(self.body_id))
             if p.getJointInfo(self.body_id, i)[2] != p.JOINT_FIXED
@@ -72,7 +71,11 @@ class ToyRobotEnv:
 
         world_vx = vx * math.cos(yaw) - vy * math.sin(yaw)
         world_vy = vx * math.sin(yaw) + vy * math.cos(yaw)
-        p.resetBaseVelocity(self.body_id, linearVelocity=[world_vx, world_vy, 0.0], angularVelocity=[0.0, 0.0, omega])
+        p.resetBaseVelocity(
+            self.body_id,
+            linearVelocity=[world_vx, world_vy, 0.0],
+            angularVelocity=[0.0, 0.0, omega],
+        )
 
         pose = action.arm_target_pose or self._last_arm_pose
         self._last_arm_pose = pose
@@ -82,8 +85,12 @@ class ToyRobotEnv:
             base_pos[1] + tx * math.sin(yaw) + ty * math.cos(yaw),
             base_pos[2] + tz,
         ]
-        joint_angles = p.calculateInverseKinematics(self.body_id, self._hand_link_index, world_target)
-        angle_by_joint_index = dict(zip(self._movable_joint_indices, joint_angles))
+        joint_angles = p.calculateInverseKinematics(
+            self.body_id, self._hand_link_index, world_target
+        )
+        angle_by_joint_index = dict(
+            zip(self._movable_joint_indices, joint_angles, strict=True)
+        )
 
         for name in (SHOULDER_JOINT, ELBOW_JOINT):
             idx = self._joint_index[name]
@@ -92,7 +99,9 @@ class ToyRobotEnv:
                 targetPosition=angle_by_joint_index[idx], force=ARM_MOTOR_FORCE,
             )
 
-        finger_target = GRIPPER_OPEN_POS if action.gripper_state == GripperState.OPEN else GRIPPER_CLOSED_POS
+        finger_target = (
+            GRIPPER_OPEN_POS if action.gripper_state == GripperState.OPEN else GRIPPER_CLOSED_POS
+        )
         for name in (FINGER_LEFT_JOINT, FINGER_RIGHT_JOINT):
             idx = self._joint_index[name]
             p.setJointMotorControl2(

@@ -9,7 +9,6 @@ actually run outside the training loop" acceptance check from §5.4.
 from __future__ import annotations
 
 import argparse
-from typing import List
 
 import numpy as np
 
@@ -18,7 +17,9 @@ from simbiote.training.policy_net import ActorCriticMLP
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Play back a trained/BC checkpoint (spec Part 5, §5.4).")
+    parser = argparse.ArgumentParser(
+        description="Play back a trained/BC checkpoint (spec Part 5, §5.4)."
+    )
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--task", type=str, required=True, choices=["nav", "grasp", "wheelchair"])
     parser.add_argument("--episodes", type=int, default=3)
@@ -27,7 +28,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_episodes(checkpoint: str, task: str, episodes: int = 3, gui: bool = False, deterministic: bool = True) -> List[dict]:
+def run_episodes(
+    checkpoint: str, task: str, episodes: int = 3, gui: bool = False, deterministic: bool = True
+) -> list[dict]:
     import torch
 
     register()
@@ -54,11 +57,14 @@ def run_episodes(checkpoint: str, task: str, episodes: int = 3, gui: bool = Fals
     return results
 
 
-def main(argv=None) -> List[dict]:
+def main(argv=None) -> list[dict]:
     args = build_arg_parser().parse_args(argv)
     results = run_episodes(args.checkpoint, args.task, args.episodes, args.gui, args.deterministic)
     for r in results:
-        print(f"[play] episode {r['episode']}: return={r['return']:.2f} steps={r['steps']} success={r.get('success')}")
+        print(
+            f"[play] episode {r['episode']}: return={r['return']:.2f} "
+            f"steps={r['steps']} success={r.get('success')}"
+        )
     mean_return = float(np.mean([r["return"] for r in results]))
     print(f"[play] mean return over {len(results)} episodes: {mean_return:.2f}")
     return results

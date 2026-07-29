@@ -18,8 +18,8 @@ gripper, derived from consecutive `arm_target_pose`s).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -33,7 +33,7 @@ from simbiote.training.policy_net import ActorCriticMLP, PolicyMeta
 DEFAULT_CHECKPOINT_DIR = Path(__file__).resolve().parent.parent.parent / "checkpoints"
 
 
-def task_action_vector(prev_ee_target: Optional[np.ndarray], action) -> Tuple[np.ndarray, np.ndarray]:
+def task_action_vector(prev_ee_target: np.ndarray | None, action) -> tuple[np.ndarray, np.ndarray]:
     """Project one logged `RobotAction` onto the grasp task's 4-dim action
     (dx, dy, dz, gripper_cmd). Returns (action_vector, new_ee_target)."""
     if action.arm_target_pose is None:
@@ -43,7 +43,9 @@ def task_action_vector(prev_ee_target: Optional[np.ndarray], action) -> Tuple[np
         # on `.position` and not a fabricated jump back to the origin.
         gripper_cmd = 1.0 if action.gripper_state == GripperState.CLOSED else -1.0
         delta = np.zeros(3, dtype=np.float32)
-        held_target = prev_ee_target if prev_ee_target is not None else np.zeros(3, dtype=np.float32)
+        held_target = (
+            prev_ee_target if prev_ee_target is not None else np.zeros(3, dtype=np.float32)
+        )
         return np.concatenate([delta, [gripper_cmd]]).astype(np.float32), held_target
 
     target = np.array(action.arm_target_pose.position, dtype=np.float32)
@@ -65,15 +67,17 @@ def task_action_vector(prev_ee_target: Optional[np.ndarray], action) -> Tuple[np
     return np.concatenate([delta, [gripper_cmd]]).astype(np.float32), new_ee_target
 
 
-def trajectories_to_dataset(trajectories: Iterable[Trajectory], task: str = "nav") -> Tuple[np.ndarray, np.ndarray]:
+def trajectories_to_dataset(
+    trajectories: Iterable[Trajectory], task: str = "nav"
+) -> tuple[np.ndarray, np.ndarray]:
     """Flatten a list of `Trajectory` into (obs, action) arrays for `task`
     ("nav" | "grasp"). Every step across every trajectory becomes one row."""
-    obs_rows: List[np.ndarray] = []
-    act_rows: List[np.ndarray] = []
+    obs_rows: list[np.ndarray] = []
+    act_rows: list[np.ndarray] = []
 
     skipped_no_obs = 0
     for traj in trajectories:
-        prev_ee_target: Optional[np.ndarray] = None
+        prev_ee_target: np.ndarray | None = None
         for step in traj.steps:
             if task == "grasp":
                 # Compute the action (and advance prev_ee_target) regardless
@@ -109,18 +113,18 @@ def trajectories_to_dataset(trajectories: Iterable[Trajectory], task: str = "nav
 
 
 def train_bc(
-    trajectories: List[Trajectory],
-    policy_net: Optional[ActorCriticMLP] = None,
+    trajectories: list[Trajectory],
+    policy_net: ActorCriticMLP | None = None,
     task: str = "nav",
-    obs_dim: Optional[int] = None,
-    act_dim: Optional[int] = None,
-    hidden_sizes: Tuple[int, ...] = (128, 128),
+    obs_dim: int | None = None,
+    act_dim: int | None = None,
+    hidden_sizes: tuple[int, ...] = (128, 128),
     epochs: int = 50,
     lr: float = 1e-3,
     batch_size: int = 64,
-    out_path: Optional[str | Path] = None,
-    act_low: Optional[Tuple[float, ...]] = None,
-    act_high: Optional[Tuple[float, ...]] = None,
+    out_path: str | Path | None = None,
+    act_low: tuple[float, ...] | None = None,
+    act_high: tuple[float, ...] | None = None,
     seed: int = 0,
 ) -> Path:
     """Supervised warm-start. Returns the path of the saved checkpoint.
@@ -143,8 +147,12 @@ def train_bc(
         )
         policy_net = ActorCriticMLP(meta)
     else:
-        assert policy_net.meta.obs_dim == obs_arr.shape[1], "policy_net obs_dim mismatch with trajectory data"
-        assert policy_net.meta.act_dim == act_arr.shape[1], "policy_net act_dim mismatch with trajectory data"
+        assert policy_net.meta.obs_dim == obs_arr.shape[1], (
+            "policy_net obs_dim mismatch with trajectory data"
+        )
+        assert policy_net.meta.act_dim == act_arr.shape[1], (
+            "policy_net act_dim mismatch with trajectory data"
+        )
 
     obs_t = torch.as_tensor(obs_arr, dtype=torch.float32)
     act_t = torch.as_tensor(act_arr, dtype=torch.float32)

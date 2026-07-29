@@ -8,7 +8,7 @@
 # when vllm-nemotron claimed --gpu-memory-utilization 0.35 (~42 GB); the driver hit
 # NV_ERR_NO_MEMORY and the box hard-locked. This script refuses to start in that state.
 #
-# Usage: scripts/gb10/validate_usd_isaac.sh <scene.usda> [--json report.json]
+# Usage: scripts/gb10/mapper/validate_usd_isaac.sh <scene.usda> [--json report.json]
 
 set -euo pipefail
 

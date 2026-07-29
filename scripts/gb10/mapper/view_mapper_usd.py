@@ -4,7 +4,7 @@ check_mapper_usd.py asserts the contract and exits; this just shows you the
 scene. Physics is left stopped so the point cloud stays where the scan put it.
 
     /home/dell/IsaacSim/_build/linux-aarch64/release/python.sh \
-        scripts/gb10/view_mapper_usd.py artifacts/mapper/out/gb10_walkthrough.usda
+        scripts/gb10/mapper/view_mapper_usd.py artifacts/mapper/out/gb10_walkthrough.usda
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from isaacsim import SimulationApp  # noqa: E402
 simulation_app = SimulationApp({"headless": False, "width": 1600, "height": 1000})
 
 import omni.usd  # noqa: E402
-from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux  # noqa: E402
+from pxr import Gf, Usd, UsdGeom, UsdLux  # noqa: E402
 
 usd_path = args.usd.resolve()
 print(f"\nOpening {usd_path} in the Isaac Sim viewport\n")
@@ -76,7 +76,7 @@ try:
     viewport_utils.get_active_viewport().camera_path = (
         "/FactoryFlowScene/ViewerCamera"
     )
-except Exception as exc:  # noqa: BLE001 - viewport is a convenience, not a contract
+except Exception as exc:
     print(f"  (could not bind the framing camera: {exc})")
 
 labelled = [

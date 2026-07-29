@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -54,7 +54,7 @@ GRASP_DIST_THRESHOLD = 0.10
 class GraspEnv(gym.Env if gym is not None else object):
     """Approach + grasp + lift a tagged object with the stand-in arm."""
 
-    metadata = {"render_modes": ["human"]}
+    metadata: ClassVar[dict] = {"render_modes": ["human"]}
 
     def __init__(
         self,
@@ -62,8 +62,8 @@ class GraspEnv(gym.Env if gym is not None else object):
         max_steps: int = 200,
         sim_steps_per_action: int = 6,
         gui: bool = False,
-        seed: Optional[int] = None,
-        object_position_override: Optional[Tuple[float, float, float]] = None,
+        seed: int | None = None,
+        object_position_override: tuple[float, float, float] | None = None,
     ):
         if gym is None:
             raise ImportError("gymnasium is required for GraspEnv (pip install gymnasium)")
@@ -82,19 +82,19 @@ class GraspEnv(gym.Env if gym is not None else object):
         obs_high = np.full(OBS_DIM, np.inf, dtype=np.float32)
         self.observation_space = spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
 
-        self._client: Optional[int] = None
-        self._robot_id: Optional[int] = None
+        self._client: int | None = None
+        self._robot_id: int | None = None
         self._handles = None
         self._object = None
         self._object_spawn_z = 0.0
-        self._arm_base_xy: Tuple[float, float] = (0.0, 0.0)
+        self._arm_base_xy: tuple[float, float] = (0.0, 0.0)
         self._ee_target = np.zeros(3, dtype=np.float32)
-        self._grasp: Optional[grasp_attach.GraspConstraint] = None
+        self._grasp: grasp_attach.GraspConstraint | None = None
         self._gripper_closed = False
         self._prev_dist = 0.0
         self._step_count = 0
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None):
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         if seed is not None:
             self._rng = random.Random(seed)
         if self._client is None:
@@ -113,8 +113,12 @@ class GraspEnv(gym.Env if gym is not None else object):
             0.25,
         )
         object_half_extent_z = 0.03
-        scene.spawn_table(self._client, (obj_pos[0], obj_pos[1]), top_height=obj_pos[2] - object_half_extent_z)
-        self._object = scene.spawn_graspable_box(self._client, obj_pos, mass_kg=self._rng.uniform(0.1, 0.5))
+        scene.spawn_table(
+            self._client, (obj_pos[0], obj_pos[1]), top_height=obj_pos[2] - object_half_extent_z
+        )
+        self._object = scene.spawn_graspable_box(
+            self._client, obj_pos, mass_kg=self._rng.uniform(0.1, 0.5)
+        )
         self._object_spawn_z = obj_pos[2]
 
         self._ee_target = np.array(self._get_ee_pos(), dtype=np.float32)
@@ -128,12 +132,16 @@ class GraspEnv(gym.Env if gym is not None else object):
     def step(self, action: np.ndarray):
         import pybullet as p
 
-        action = np.clip(np.asarray(action, dtype=np.float32), self.action_space.low, self.action_space.high)
+        action = np.clip(
+            np.asarray(action, dtype=np.float32), self.action_space.low, self.action_space.high
+        )
         delta, gripper_cmd = action[:3], float(action[3])
 
         limits = self.robot_config.action_limits
         candidate = self._ee_target + delta
-        candidate[2] = float(np.clip(candidate[2], limits.arm_workspace_min_z, limits.arm_workspace_max_z))
+        candidate[2] = float(
+            np.clip(candidate[2], limits.arm_workspace_min_z, limits.arm_workspace_max_z)
+        )
         # `arm_workspace_radius` is documented (robot_config.py) as reach
         # from `arm_base_link`, not from the world origin -- clip relative
         # to the arm's actual base position so valid targets near the arm
@@ -208,7 +216,7 @@ class GraspEnv(gym.Env if gym is not None else object):
             targetPosition=self._ee_target.tolist(),
             lowerLimits=lower,
             upperLimits=upper,
-            jointRanges=[u - l for l, u in zip(lower, upper)],
+            jointRanges=[high - low for low, high in zip(lower, upper, strict=True)],
             restPoses=current,
             jointDamping=[0.05] * len(indices),
             maxNumIterations=200,
@@ -240,7 +248,7 @@ class GraspEnv(gym.Env if gym is not None else object):
                 physicsClientId=self._client,
             )
 
-    def _get_arm_base_xy(self) -> Tuple[float, float]:
+    def _get_arm_base_xy(self) -> tuple[float, float]:
         import pybullet as p
 
         if self._handles.arm_base_link_index < 0:
@@ -248,22 +256,28 @@ class GraspEnv(gym.Env if gym is not None else object):
             # `arm_base_link` -- treat the workspace as origin-centered
             # (previous behavior) rather than erroring.
             return (0.0, 0.0)
-        state = p.getLinkState(self._robot_id, self._handles.arm_base_link_index, physicsClientId=self._client)
+        state = p.getLinkState(
+            self._robot_id, self._handles.arm_base_link_index, physicsClientId=self._client
+        )
         return state[0][0], state[0][1]
 
-    def _get_ee_pos(self) -> Tuple[float, float, float]:
+    def _get_ee_pos(self) -> tuple[float, float, float]:
         import pybullet as p
 
-        state = p.getLinkState(self._robot_id, self._handles.ee_link_index, physicsClientId=self._client)
+        state = p.getLinkState(
+            self._robot_id, self._handles.ee_link_index, physicsClientId=self._client
+        )
         return state[0]
 
-    def _get_ee_pose(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float, float]]:
+    def _get_ee_pose(self) -> tuple[tuple[float, float, float], tuple[float, float, float, float]]:
         import pybullet as p
 
-        state = p.getLinkState(self._robot_id, self._handles.ee_link_index, physicsClientId=self._client)
+        state = p.getLinkState(
+            self._robot_id, self._handles.ee_link_index, physicsClientId=self._client
+        )
         return state[0], state[1]
 
-    def _object_pos(self) -> Tuple[float, float, float]:
+    def _object_pos(self) -> tuple[float, float, float]:
         import pybullet as p
 
         pos, _ = p.getBasePositionAndOrientation(self._object.body_id, physicsClientId=self._client)
@@ -288,7 +302,10 @@ class GraspEnv(gym.Env if gym is not None else object):
 
         if self._grasp is None and self._gripper_closed and dist < GRASP_DIST_THRESHOLD:
             self._grasp = grasp_attach.attach(
-                self._robot_id, self._handles.ee_link_index, self._object.body_id, physics_client=self._client
+                self._robot_id,
+                self._handles.ee_link_index,
+                self._object.body_id,
+                physics_client=self._client,
             )
             reward += 10.0
             grasped_this_step = True
@@ -321,13 +338,19 @@ class GraspEnv(gym.Env if gym is not None else object):
         obj_pos = self._object_pos()
         rel = tuple(obj_pos[i] - ee_pos[i] for i in range(3))
         limits = self.robot_config.action_limits
-        gripper_opening = limits.gripper_close_width if self._gripper_closed else limits.gripper_open_width
+        gripper_opening = (
+            limits.gripper_close_width if self._gripper_closed else limits.gripper_open_width
+        )
         obs = (
             list(ee_pos)
             + list(ee_orn)
             + [gripper_opening]
             + list(obj_pos)
             + list(rel)
-            + [math.dist(ee_pos, obj_pos), self._object.mass_kg, 1.0 if self._grasp is not None else 0.0]
+            + [
+                math.dist(ee_pos, obj_pos),
+                self._object.mass_kg,
+                1.0 if self._grasp is not None else 0.0,
+            ]
         )
         return np.array(obs, dtype=np.float32)

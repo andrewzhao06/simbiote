@@ -62,7 +62,6 @@ def test_pick_up_runs_end_to_end(tmp_path):
 
 @require_pybullet
 def test_attach_and_detach_wheelchair_handle():
-    from simbiote.sim_env import pybullet_scene as scene
     from simbiote.sim_env.spawn import despawn, spawn_robot
     from simbiote.sim_env.wheelchair_task import WHEELCHAIR_URDF
 
@@ -70,7 +69,9 @@ def test_attach_and_detach_wheelchair_handle():
     try:
         import pybullet as p
 
-        chair_id = p.loadURDF(WHEELCHAIR_URDF, basePosition=[0.3, 0, 0.18], physicsClientId=robot.physics_client)
+        chair_id = p.loadURDF(
+            WHEELCHAIR_URDF, basePosition=[0.3, 0, 0.18], physicsClientId=robot.physics_client
+        )
         constraint = skills.attach_handle(robot, chair_id)
         assert constraint.constraint_id is not None
         skills.detach(constraint)

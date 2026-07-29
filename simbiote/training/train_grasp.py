@@ -17,11 +17,23 @@ DEFAULT_CHECKPOINT_DIR = Path(__file__).resolve().parent.parent.parent / "checkp
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Train the manipulation (grasp) policy (spec Part 5, §5.4).")
-    parser.add_argument("--task", default="grasp", choices=["grasp"], help="kept for CLI-shape parity with train_nav.py")
+    parser = argparse.ArgumentParser(
+        description="Train the manipulation (grasp) policy (spec Part 5, §5.4)."
+    )
+    parser.add_argument(
+        "--task",
+        default="grasp",
+        choices=["grasp"],
+        help="kept for CLI-shape parity with train_nav.py",
+    )
     parser.add_argument("--num_envs", type=int, default=4)
     parser.add_argument("--timesteps", type=int, default=20_000)
-    parser.add_argument("--checkpoint", type=str, default=None, help="warm-start weights, e.g. checkpoints/grasp_bc.pt")
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=None,
+        help="warm-start weights, e.g. checkpoints/grasp_bc.pt",
+    )
     parser.add_argument("--rl_lib", type=str, default="custom", choices=["custom"])
     parser.add_argument("--out", type=str, default=str(DEFAULT_CHECKPOINT_DIR / "grasp_ppo.pt"))
     parser.add_argument("--gui", action="store_true")
@@ -70,7 +82,8 @@ def main(argv=None) -> Path:
     def progress(stats: dict) -> None:
         print(
             f"[train_grasp] update={stats['update']} timesteps={stats['timesteps']} "
-            f"mean_return={stats['mean_episode_return']:.2f} success_rate={stats['success_rate']:.2f} "
+            f"mean_return={stats['mean_episode_return']:.2f} "
+            f"success_rate={stats['success_rate']:.2f} "
             f"episodes={stats['num_episodes']}"
         )
         score = stats["success_rate"]
@@ -81,7 +94,9 @@ def main(argv=None) -> Path:
             # train_ppo mutates `policy` in place, so this is the live network.
             policy.save(out_path)
 
-    trained = train_ppo([make_env_fn(i) for i in range(args.num_envs)], policy, config, progress_callback=progress)
+    trained = train_ppo(
+        [make_env_fn(i) for i in range(args.num_envs)], policy, config, progress_callback=progress
+    )
 
     if best["score"] == float("-inf"):
         trained.save(out_path)
