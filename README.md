@@ -528,6 +528,7 @@ Console entry points (`pyproject.toml`): `simbiote-map`, `simbiote-teleop`,
   platform plan, tech stack, and per-step design.
 - [`docs/GB10_DOWNLOADS.md`](docs/GB10_DOWNLOADS.md) — model/download checklist.
 - [`docs/GB10_MEMORY_BUDGET.md`](docs/GB10_MEMORY_BUDGET.md) — what fits on the box.
+- [`docs/GB10_OPERATIONS.md`](docs/GB10_OPERATIONS.md) — end-to-end GB10 run and handoff guide.
 - [`docs/SSD_LAYOUT.md`](docs/SSD_LAYOUT.md) — external SSD layout.
 - [`docs/TELEOP_IPHONE_CAMERA.md`](docs/TELEOP_IPHONE_CAMERA.md) — phone-as-webcam on aarch64.
 - [`docs/TELEOP_ISAAC_HOSPITAL.md`](docs/TELEOP_ISAAC_HOSPITAL.md) — hand teleop into Isaac Sim.
